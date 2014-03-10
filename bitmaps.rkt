@@ -16,7 +16,8 @@
          bloke-shut
          bloke-ajar-left bloke-ajar-right bloke-ajar-up bloke-ajar-down
          bloke-open-left bloke-open-right bloke-open-up bloke-open-down
-         ghost scared-ghost)
+         ghost scared-ghost
+         score-200 score-400 score-800 score-1600)
           
 (define (make-proto-bitmap width height lst)
   (define (make-row lst)
@@ -416,3 +417,58 @@
 (define ghost (proto-bitmap->bitmap p-ghost))
 (define scared-ghost (proto-bitmap->bitmap p-scared-ghost))
 
+;; ghost scores
+;; ~~~~~~~~~~~~
+
+(define p-score-200
+  (make-proto-bitmap 20
+                     20
+                     '(() () () () () ()
+                       (0 0 1 1 1 1 0 0 1 1 1 1 0 0 1 1 1 1)
+                       (0 0 0 0 0 1 0 0 1 0 0 1 0 0 1 0 0 1)
+                       (0 0 0 0 0 1 0 0 1 0 0 1 0 0 1 0 0 1)
+                       (0 0 1 1 1 1 0 0 1 0 0 1 0 0 1 0 0 1)
+                       (0 0 1 0 0 0 0 0 1 0 0 1 0 0 1 0 0 1)
+                       (0 0 1 0 0 0 0 0 1 0 0 1 0 0 1 0 0 1)
+                       (0 0 1 1 1 1 0 0 1 1 1 1 0 0 1 1 1 1))))
+
+(define p-score-400
+  (make-proto-bitmap 20
+                     20
+                     '(() () () () () ()
+                       (0 0 1 0 0 0 0 0 1 1 1 1 0 0 1 1 1 1)
+                       (0 0 1 0 0 0 0 0 1 0 0 1 0 0 1 0 0 1)
+                       (0 0 1 0 1 0 0 0 1 0 0 1 0 0 1 0 0 1)
+                       (0 0 1 0 1 0 0 0 1 0 0 1 0 0 1 0 0 1)
+                       (0 0 1 1 1 1 0 0 1 0 0 1 0 0 1 0 0 1)
+                       (0 0 0 0 1 0 0 0 1 0 0 1 0 0 1 0 0 1)
+                       (0 0 0 0 1 0 0 0 1 1 1 1 0 0 1 1 1 1))))
+
+(define p-score-800
+  (make-proto-bitmap 20
+                     20
+                     '(() () () () () ()
+                       (0 0 1 1 1 1 0 0 1 1 1 1 0 0 1 1 1 1)
+                       (0 0 1 0 0 1 0 0 1 0 0 1 0 0 1 0 0 1)
+                       (0 0 1 0 0 1 0 0 1 0 0 1 0 0 1 0 0 1)
+                       (0 0 1 1 1 1 0 0 1 0 0 1 0 0 1 0 0 1)
+                       (0 0 1 0 0 1 0 0 1 0 0 1 0 0 1 0 0 1)
+                       (0 0 1 0 0 1 0 0 1 0 0 1 0 0 1 0 0 1)
+                       (0 0 1 1 1 1 0 0 1 1 1 1 0 0 1 1 1 1))))
+
+(define p-score-1600
+  (make-proto-bitmap 20
+                     20
+                     '(() () () () () ()
+                       (0 1 0 0 1 1 1 1 0 0 1 1 1 1 0 0 1 1 1 1)
+                       (1 1 0 0 1 0 0 0 0 0 1 0 0 1 0 0 1 0 0 1)
+                       (0 1 0 0 1 0 0 0 0 0 1 0 0 1 0 0 1 0 0 1)
+                       (0 1 0 0 1 1 1 1 0 0 1 0 0 1 0 0 1 0 0 1)
+                       (0 1 0 0 1 0 0 1 0 0 1 0 0 1 0 0 1 0 0 1)
+                       (0 1 0 0 1 0 0 1 0 0 1 0 0 1 0 0 1 0 0 1)
+                       (0 1 0 0 1 1 1 1 0 0 1 1 1 1 0 0 1 1 1 1))))
+
+(define score-200 (proto-bitmap->bitmap p-score-200))
+(define score-400 (proto-bitmap->bitmap p-score-400))
+(define score-800 (proto-bitmap->bitmap p-score-800))
+(define score-1600 (proto-bitmap->bitmap p-score-1600))

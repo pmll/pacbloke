@@ -16,6 +16,7 @@
          last-input-a-direction?
          toggle-sound!
          sound-on?
+         make-ghost-bounty
          )
 
 (define (eatable? cell-content)
@@ -98,4 +99,14 @@
 (define (toggle-sound!) (set! *sound-on* (not *sound-on*)))
 
 (define (sound-on?) *sound-on*)
+
+(define (make-ghost-bounty init-value)
+  (define bounty 0)
+  (lambda (op)
+    (cond ((eq? op 'reset) (set! bounty init-value) bounty)
+          ((eq? op 'consume)
+           (begin0
+             bounty
+             (set! bounty (* bounty 2))))
+          (else bounty))))
 

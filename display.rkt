@@ -8,7 +8,9 @@
          render-ghost
          render-dot-eaten
          render-powerpill-eaten
-         unrender)
+         unrender
+         render-ghost-score
+         unrender-ghost-score)
 
 (require racket/gui/base)
 (require "bitmaps.rkt"
@@ -69,6 +71,7 @@
           ('scaredghost "DodgerBlue")
           ('scaredghostending "White")
           ('forcefield "Lime")
+          ('ghostscore "Turquoise")
           (else "Black"))))
 
 (define (render-maze maze-canvas maze)
@@ -103,7 +106,11 @@
           (else
             (let ((reveal (cell-state maze-state ux uy)))
               (send dc draw-bitmap
-                       (cell-bitmap reveal 'gap 'gap 'gap 'gap)
+                       (cell-bitmap reveal
+                                    (cell-state maze-state ux (- uy 1))
+                                    (cell-state maze-state ux (+ uy 1))
+                                    (cell-state maze-state (- ux 1) uy)
+                                    (cell-state maze-state (+ ux 1) uy))
                        (* ux cell-size)
                        (* uy cell-size)
                        'opaque
@@ -145,6 +152,32 @@
                                       ((2) 'ghost2)
                                       ((3) 'ghost3)
                                       ((0) 'ghost4)))))))
+
+(define (ghost-score-x-y player-x player-y ghost-x ghost-y)
+  (let ((x (cond ((> ghost-x player-x) (+ player-x 1))
+                 ((< ghost-x player-x) (- player-x 1))
+                 (else ghost-x)))
+        (y (cond ((> ghost-y player-y) (+ player-y 1))
+                 ((< ghost-y player-y) (- player-y 1))
+                 (else ghost-y))))
+    (values x y)))
+
+(define (render-ghost-score player-x player-y ghost-x ghost-y score dc)
+  (let-values (((x y) (ghost-score-x-y player-x player-y ghost-x ghost-y)))
+    (send dc draw-bitmap
+             (case score
+               ((200) score-200)
+               ((400) score-400)
+               ((800) score-800)
+               ((1600) score-1600))
+             (* x cell-size)
+             (* y cell-size)
+             'opaque
+             (cell-colour 'ghostscore))))
+
+(define (unrender-ghost-score player-x player-y ghost-x ghost-y maze-state dc)
+  (let-values (((x y) (ghost-score-x-y player-x player-y ghost-x ghost-y)))
+    (unrender x y dc maze-state)))
 
 (define (render-score score-canvas score-dc lives score)
   (send score-canvas min-height 30)

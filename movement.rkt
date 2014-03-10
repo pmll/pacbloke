@@ -7,6 +7,9 @@
          player-movement
          ghost-movement
          scared-ghost-frames
+         player-caught?
+         ghosts-caught
+         back-to-base
          (struct-out roamer)
          (struct-out ghost))
 
@@ -17,6 +20,8 @@
 (define ghost-speed 5)
 
 (define scared-ghost-speed 6)
+
+(define min-collision-area (/ 1 10))
 
 (define scared-ghost-frames 100)
 
@@ -160,4 +165,48 @@
                                                 direction-request)
                               (ghost-roamer g)))))))
   (map (lambda (g) (move-ghost (transform-ghost g))) ghost-lst))
+
+
+
+;; provide a list of of ghost refs that have collided with our player
+(define (collisions player-x player-y ghost-lst mode)
+  (define (overlap x1 x2)
+    (let ((xdiff (abs (- x1 x2))))
+      (if (< xdiff 1) (- 1 xdiff) 0)))
+  (define (collision-area ghost-x ghost-y)
+    (* (overlap player-x ghost-x) (overlap player-y ghost-y)))
+  (define (collision? g)
+    (and (eq? (ghost-mode g) mode)
+         (>= (collision-area (roamer-x (ghost-roamer g))
+                             (roamer-y (ghost-roamer g)))
+             min-collision-area)))
+  (let ghost-ids ((ghost-lst ghost-lst))
+    (cond ((null? ghost-lst) '())
+          ((collision? (car ghost-lst))
+           (cons (ghost-id (car ghost-lst)) (ghost-ids (cdr ghost-lst))))
+          (else (ghost-ids (cdr ghost-lst))))))
+
+(define (player-caught? player ghost-lst)
+  (not (null? (collisions (roamer-x player)
+                          (roamer-y player)
+                          ghost-lst
+                          'chasing))))
+
+(define (ghosts-caught player ghost-lst)
+  (collisions (roamer-x player) (roamer-y player) ghost-lst 'fleeing))
+
+;; this proc is a temporary measure
+;; it is here to set ghost structs to their base location
+;; once we have maze graphs in place, we can have another ghost mode for the
+;; um... ghosts of ghosts and they can make their way back to base via the
+;; shortest route
+(define (back-to-base g)
+  (struct-copy ghost g (mode 'chasing)
+                       (next-speed #f)
+                       (roamer (make-roamer (ghost-home-x g)
+                                            (ghost-home-y g)
+                                            ghost-speed
+                                            #f
+                                            #f
+                                            '(wall)))))
 
