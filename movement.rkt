@@ -19,7 +19,7 @@
 
 (define ghost-speed 5)
 
-(define scared-ghost-speed 6)
+(define scared-ghost-speed 10)
 
 (define min-collision-area (/ 1 10))
 
@@ -34,9 +34,9 @@
 ;; so the higher the value, the slower the travel
 ;; that way, the object in question is guaranteed to exactly align with a cell
 ;; at some point as it travels through it
-(define-struct roamer (x y speed direction next-direction blocked-by))
+(define-struct roamer (x y speed direction next-direction blocked-by next-speed))
 
-(define-struct ghost (roamer id mode flee-frame home-x home-y next-speed))
+(define-struct ghost (roamer id mode flee-frame home-x home-y))
 
 (define (make-player maze)
   (let ((pos (vector-memq 'player (maze-map maze))))
@@ -45,23 +45,22 @@
                  player-speed
                  #f
                  #f
-                 '(wall forcefield))))
+                 '(wall forcefield)
+                 #f)))
 
 (define (make-ghosts maze)
   (let loop ((x 0) (y 0) (id 1))
     (cond ((= y (maze-height maze)) '())
           ((= x (maze-width maze)) (loop 0 (+ y 1) id))
           ((eq? (maze-cell maze x y) 'ghost)
-           (cons (make-ghost (make-roamer x y ghost-speed #f #f '(wall))
+           (cons (make-ghost (make-roamer x y ghost-speed #f #f '(wall) #f)
                              id
                              'chasing
                              0
                              x
-                             y
-                             #f)
+                             y)
                  (loop (+ x 1) y (+ id 1))))
           (else (loop (+ x 1) y id)))))
-
 
 (define (next-position maze x y direction speed)
   (cond ((eq? direction 'up) 
@@ -94,32 +93,37 @@
   (struct-copy roamer r (next-direction direction)))
 
 (define (change-speed r new-speed)
-  (struct-copy roamer r (speed new-speed)))
+  (struct-copy roamer r (next-speed new-speed)))
 
 (define (navigate maze r)
-  (let ((x (roamer-x r))
-        (y (roamer-y r))
-        (speed (roamer-speed r))
-        (next-direction (roamer-next-direction r))
-        (blocked-by (roamer-blocked-by r)))
+  (let ((next-direction (roamer-next-direction r)))
     (if next-direction
         (let-values (((next-x next-y)
-                      (next-position maze x y next-direction speed)))
-          (if (can-occupy-coordinates? maze next-x next-y blocked-by)
-              (make-roamer x y speed next-direction #f blocked-by)
+                      (next-position maze
+                                     (roamer-x r)
+                                     (roamer-y r) 
+                                     next-direction 
+                                     (roamer-speed r))))
+          (if (can-occupy-coordinates? maze next-x next-y (roamer-blocked-by r))
+              (struct-copy roamer r (direction next-direction))
               r))
         r)))
 
 (define (continue-motion maze r)
-  (let ((x (roamer-x r))
-        (y (roamer-y r))
-        (direction (roamer-direction r))
-        (speed (roamer-speed r))
-        (next-direction (roamer-next-direction r))
-        (blocked-by (roamer-blocked-by r)))
-    (let-values (((next-x next-y) (next-position maze x y direction speed)))
-      (if (can-occupy-coordinates? maze next-x next-y blocked-by)
-          (make-roamer next-x next-y speed direction next-direction blocked-by)
+  (let ((next-speed (roamer-next-speed r)))
+    (let-values (((next-x next-y) (next-position maze
+                                                 (roamer-x r)
+                                                 (roamer-y r)
+                                                 (roamer-direction r)
+                                                 (roamer-speed r))))
+      (if (can-occupy-coordinates? maze next-x next-y (roamer-blocked-by r))
+          (struct-copy roamer r (x next-x)
+                                (y next-y)
+                                (speed (if (and next-speed
+                                                (integer? next-x)
+                                                (integer? next-y))
+                                           next-speed
+                                           (roamer-speed r))))
           r))))
 
 (define (realise-motion maze r)
@@ -137,9 +141,10 @@
   (define (become-scared g)
     (struct-copy ghost g (flee-frame frame-number)
                          (mode 'fleeing)
-                         (next-speed scared-ghost-speed)))
+                         (roamer (change-speed (ghost-roamer g) scared-ghost-speed))))
   (define (become-bold g)
-    (struct-copy ghost g (mode 'chasing) (next-speed ghost-speed)))
+    (struct-copy ghost g (mode 'chasing)
+                         (roamer (change-speed (ghost-roamer g) ghost-speed))))
   (define (transform-ghost g)
     (cond ((eq? last-meal 'powerpill) (become-scared g))
           ((and (eq? (ghost-mode g) 'fleeing)
@@ -202,11 +207,11 @@
 ;; shortest route
 (define (back-to-base g)
   (struct-copy ghost g (mode 'chasing)
-                       (next-speed #f)
                        (roamer (make-roamer (ghost-home-x g)
                                             (ghost-home-y g)
                                             ghost-speed
                                             #f
                                             #f
-                                            '(wall)))))
+                                            '(wall)
+                                            #f))))
 

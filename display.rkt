@@ -10,7 +10,9 @@
          render-powerpill-eaten
          unrender
          render-ghost-score
-         unrender-ghost-score)
+         unrender-ghost-score
+         render-ghost-eaten
+         render-lose-life)
 
 (require racket/gui/base)
 (require "bitmaps.rkt"
@@ -21,6 +23,20 @@
 
 (define ghost-flash-period 3)
 (define ghost-flash-point 21)
+
+(define wall-colour (send the-color-database find-color "DodgerBlue"))
+(define dot-colour (send the-color-database find-color "Ivory"))
+(define powerpill-colour (send the-color-database find-color "Wheat"))
+(define player-colour (send the-color-database find-color "Yellow"))
+(define ghost1-colour (send the-color-database find-color "Orange"))
+(define ghost2-colour (send the-color-database find-color "OrangeRed"))
+(define ghost3-colour (send the-color-database find-color "LightPink"))
+(define ghost4-colour (send the-color-database find-color "Aqua"))
+(define scaredghost-colour (send the-color-database find-color "DodgerBlue"))
+(define scaredghostending-colour (send the-color-database find-color "White"))
+(define forcefield-colour (send the-color-database find-color "Lime"))
+(define ghostscore-colour (send the-color-database find-color "Turquoise"))
+(define other-colour (send the-color-database find-color "Black"))
 
 (define (cell-bitmap cell cell-above cell-below cell-left cell-right)
   (let* ((wall-above? (eq? cell-above 'wall))
@@ -57,22 +73,13 @@
           (else blank))))
 
 (define (cell-colour obj)
-  (send the-color-database 
-        find-color
-        (case obj
-          ('wall "DodgerBlue")
-          ('dot  "Ivory")
-          ('powerpill "Wheat")
-          ('bloke "Yellow")
-          ('ghost1 "Orange")
-          ('ghost2 "OrangeRed")
-          ('ghost3 "LightPink")
-          ('ghost4 "Aqua")
-          ('scaredghost "DodgerBlue")
-          ('scaredghostending "White")
-          ('forcefield "Lime")
-          ('ghostscore "Turquoise")
-          (else "Black"))))
+  (case obj
+    ('wall wall-colour)
+    ('dot dot-colour)
+    ('powerpill powerpill-colour)
+    ('bloke player-colour)
+    ('forcefield forcefield-colour)
+    (else other-colour)))
 
 (define (render-maze maze-canvas maze)
   (send maze-canvas min-height (* cell-size (maze-height maze)))
@@ -133,25 +140,25 @@
                      (else bloke-open-right))))
            (* x cell-size)
            (* y cell-size) 
-           'opaque
-           (cell-colour 'bloke)))
+           'solid
+           player-colour))
 
 (define (render-ghost x y id mode flee-frames-left dc)
   (send dc draw-bitmap
            (if (eq? mode 'fleeing) scared-ghost ghost)
            (* x cell-size)
            (* y cell-size)
-           'opaque
+           'solid  ;; not sure if I really like this setting for ghosts...
            (cond ((eq? mode 'fleeing) 
                   (if (and (< flee-frames-left ghost-flash-point) 
                            (zero? (remainder flee-frames-left ghost-flash-period)))
-                      (cell-colour 'scaredghostending)
-                      (cell-colour 'scaredghost)))
-                 (else (cell-colour (case (remainder id 4)
-                                      ((1) 'ghost1)
-                                      ((2) 'ghost2)
-                                      ((3) 'ghost3)
-                                      ((0) 'ghost4)))))))
+                      scaredghostending-colour
+                      scaredghost-colour))
+                 (else (case (remainder id 4)
+                         ((1) ghost1-colour)
+                         ((2) ghost2-colour)
+                         ((3) ghost3-colour)
+                         ((0) ghost4-colour))))))
 
 (define (ghost-score-x-y player-x player-y ghost-x ghost-y)
   (let ((x (cond ((> ghost-x player-x) (+ player-x 1))
@@ -173,7 +180,7 @@
              (* x cell-size)
              (* y cell-size)
              'opaque
-             (cell-colour 'ghostscore))))
+             ghostscore-colour)))
 
 (define (unrender-ghost-score player-x player-y ghost-x ghost-y maze-state dc)
   (let-values (((x y) (ghost-score-x-y player-x player-y ghost-x ghost-y)))
@@ -200,7 +207,7 @@
                          (* life 2 cell-size)
                          5
                          'opaque
-                         (cell-colour 'bloke))
+                         player-colour)
                          (loop (+ life 1))))
   (send score-dc draw-text (format "~a" score) (* 10 cell-size) 5))
 
@@ -214,3 +221,10 @@
 
 (define (render-powerpill-eaten)
   (sound-effect "eatpill.wav"))
+
+(define (render-ghost-eaten)
+  (sound-effect "eatghost.wav"))
+
+(define (render-lose-life)
+  (sound-effect "loselife.wav"))
+

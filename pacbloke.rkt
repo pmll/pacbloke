@@ -63,6 +63,7 @@
     ;; an animation sequence of the death throes would be nice at this point.
     ;; for now, we pause a short while so as the calamity can be observed
     (send ticker stop)
+    (render-lose-life)
     (sleep 3)
     (if (> (lives! -1) 0)
         (let ((new-player (make-player maze))
@@ -128,6 +129,7 @@
                                             maze-dc)
                         (send maze-canvas resume-flush)
                         (send maze-canvas flush)
+                        (render-ghost-eaten)
                         ;; pause just long enough to read the score
                         (sleep 0.5)
                         (send maze-canvas suspend-flush)
