@@ -22,10 +22,11 @@
 (define (eatable? cell-content)
   (or (eq? cell-content 'dot) (eq? cell-content 'powerpill)))
 
-(define (eatables maze) (vector-count eatable? (maze-map maze)))
+(define (eatables maze)
+  (+ (maze-count maze 'dot) (maze-count maze 'powerpill)))
   
 (define (make-maze-state maze)
-  (list (vector-copy (maze-map maze))
+  (list (maze->vector maze)
         (maze-width maze)
         (maze-height maze)
         (box (eatables maze))))

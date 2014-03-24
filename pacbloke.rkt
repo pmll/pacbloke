@@ -64,7 +64,7 @@
     ;; for now, we pause a short while so as the calamity can be observed
     (send ticker stop)
     (render-lose-life)
-    (sleep 3)
+    (sleep 2)
     (if (> (lives! -1) 0)
         (let ((new-player (make-player maze))
           (new-ghost-lst (make-ghosts maze)))
@@ -82,7 +82,12 @@
   (define (play-frame)
     (let* ((new-player (player-movement player (if (last-input-a-direction?) (last-input) #f) maze))
            (player-meal (eat-cell! maze-state new-player))
-           (new-ghost-lst (ghost-movement ghost-lst maze player-meal frame-number)))
+           (new-ghost-lst (ghost-movement ghost-lst
+                                          maze
+                                          player-meal
+                                          frame-number
+                                          (roamer-x player)
+                                          (roamer-y player))))
       (send maze-canvas suspend-flush)
       (unrender-all-roamers player ghost-lst)
       (render-all-roamers new-player new-ghost-lst)
@@ -168,5 +173,7 @@
   (send maze-canvas focus)
   (display "playing a maze") (newline))
 
-(play-maze (make-scorer 0) (make-scorer 3) (list mini-trad-maze))
+(play-maze (make-scorer 0)
+           (make-scorer 3)
+           (list mini-trad-maze example-maze traditional-maze))
 
