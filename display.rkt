@@ -6,6 +6,7 @@
          render-score
          render-bloke
          render-ghost
+         render-node-halo ;; debug
          render-dot-eaten
          render-powerpill-eaten
          unrender
@@ -160,6 +161,20 @@
                          ((3) ghost3-colour)
                          ((0) ghost4-colour))))))
 
+;; debug
+(define (render-node-halo x y id dc)
+  (send dc draw-bitmap
+           node-halo
+           (* x cell-size)
+           (* y cell-size)
+           'solid
+           (case (remainder id 4)
+             ((1) ghost1-colour)
+             ((2) ghost2-colour)
+             ((3) ghost3-colour)
+             ((0) ghost4-colour))))
+
+
 (define (ghost-score-x-y player-x player-y ghost-x ghost-y)
   (let ((x (cond ((> ghost-x player-x) (+ player-x 1))
                  ((< ghost-x player-x) (- player-x 1))
@@ -227,4 +242,6 @@
 
 (define (render-lose-life)
   (sound-effect "loselife.wav"))
+
+
 

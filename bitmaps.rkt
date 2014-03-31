@@ -17,6 +17,7 @@
          bloke-ajar-left bloke-ajar-right bloke-ajar-up bloke-ajar-down
          bloke-open-left bloke-open-right bloke-open-up bloke-open-down
          ghost scared-ghost
+         node-halo  ;; debug
          score-200 score-400 score-800 score-1600)
           
 (define (make-proto-bitmap width height lst)
@@ -472,3 +473,31 @@
 (define score-400 (proto-bitmap->bitmap p-score-400))
 (define score-800 (proto-bitmap->bitmap p-score-800))
 (define score-1600 (proto-bitmap->bitmap p-score-1600))
+
+;; debug bitmap
+(define p-node-halo
+  (make-proto-bitmap 20
+                     20
+                     '((0 0 0 0 0 0 0 1 1 1 1 1 1)
+                       (0 0 0 0 0 1 1 1 0 0 0 0 1 1 1)
+                       (0 0 0 1 1 1 0 0 0 0 0 0 0 0 1 1 1)
+                       (0 0 1 1 0 0 0 0 0 0 0 0 0 0 0 0 1 1)
+                       (0 0 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1)
+                       (0 1 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 1) 
+                       (0 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1)
+                       (1 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 1)
+                       (1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1) 
+                       (1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1) 
+                       (1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1) 
+                       (1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1) 
+                       (1 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 1)
+                       (0 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1)
+                       (0 1 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 1) 
+                       (0 0 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1)
+                       (0 0 1 1 0 0 0 0 0 0 0 0 0 0 0 0 1 1)
+                       (0 0 0 1 1 1 0 0 0 0 0 0 0 0 1 1 1)
+                       (0 0 0 0 0 1 1 1 0 0 0 0 1 1 1)
+                       (0 0 0 0 0 0 0 1 1 1 1 1 1))))
+
+
+(define node-halo (proto-bitmap->bitmap p-node-halo))

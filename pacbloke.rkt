@@ -7,9 +7,13 @@
 (require "mazes.rkt"
          "display.rkt"
          "movement.rkt"
-         "state.rkt")
+         "state.rkt"
+         "maze.rkt")
+
+(define debug #t)
 
 (define frame-interval 50)
+;(define frame-interval 250)
 
 (define game-canvas%
   (class canvas%
@@ -42,7 +46,13 @@
                                     (roamer-y (ghost-roamer g))
                                     maze-dc
                                     maze-state))
-              ghost-lst))
+              ghost-lst)
+    (when debug
+          (for-each (lambda (g) (unrender (node-x (target-node (ghost-target g)))
+                                         (node-y (target-node (ghost-target g)))
+                                         maze-dc
+                                         maze-state))
+                    ghost-lst)))
   (define (render-player player)
     (render-bloke (roamer-x player)
                   (roamer-y player)
@@ -58,7 +68,12 @@
                                        (+ (- scared-ghost-frames
                                              frame-number)
                                           (ghost-flee-frame g))
-                                       maze-dc)))
+                                       maze-dc))
+    (when debug (for ((g ghost-lst))
+                     (render-node-halo (node-x (target-node (ghost-target g)))
+                                       (node-y (target-node (ghost-target g)))
+                                       (ghost-id g)
+                                       maze-dc))))
   (define (player-death)
     ;; an animation sequence of the death throes would be nice at this point.
     ;; for now, we pause a short while so as the calamity can be observed
@@ -67,7 +82,7 @@
     (sleep 2)
     (if (> (lives! -1) 0)
         (let ((new-player (make-player maze))
-          (new-ghost-lst (make-ghosts maze)))
+              (new-ghost-lst (make-ghosts maze)))
           (send maze-canvas suspend-flush)
           (unrender-all-roamers player ghost-lst)
           (render-all-roamers new-player new-ghost-lst)
@@ -171,6 +186,7 @@
          (interval frame-interval)))
   (send maze-frame show #t)
   (send maze-canvas focus)
+  (when debug (display-shortest-dists maze))
   (display "playing a maze") (newline))
 
 (play-maze (make-scorer 0)

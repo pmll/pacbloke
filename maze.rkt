@@ -3,6 +3,7 @@
 ;; maze data structure
 
 (provide infinity
+         unassigned-shortcut
          make-maze
          maze-width
          maze-height
@@ -12,6 +13,7 @@
          maze-count
          maze->vector
          shortest
+         display-shortest-dists
          (struct-out node)
          (struct-out fingerpost)
          (struct-out shortcut))
@@ -22,7 +24,9 @@
 
 (define-struct fingerpost (node direction distance))
 
-(define-struct shortcut (direction distance))
+(define-struct shortcut (direction distance via))
+
+(define unassigned-shortcut (make-shortcut 'none infinity #f))
 
 (struct maze (width height grid nodes navgrid shortest-dists))
 
@@ -57,13 +61,13 @@
                                    (+ (modulo x width)
                                       (* (modulo y height) width))))
     (and (not (eq? cell-value 'wall)) (not (eq? cell-value 'void))))
-  (define (ways-out x y)
+  (define (exits x y)
     (+ (if (path? (- x 1) y) 1 0)
        (if (path? (+ x 1)  y) 1 0)
        (if (path? x (- y 1)) 1 0)
        (if (path? x (+ y 1)) 1 0)))
-  ;; for our purposes, a node is any path cell that does not have two ways out
-  (define (node? x y) (not (= (ways-out x y) 2)))
+  ;; for our purposes, a node is any path cell that does not have two exits
+  (define (node? x y) (not (= (exits x y) 2)))
   (define nodes
     (let loop ((x 0) (y 0) (id 0))
       (cond ((= y height) '())
@@ -79,15 +83,14 @@
         (and (not (and (= x prev-x) (= y prev-y))) (path? x y)))
       (define (adj-x v) (modulo (+ x v) width))
       (define (adj-y v) (modulo (+ y v) height))
-      (if xy-node
-          (values xy-node dist)
-          (cond ((path-continues? (adj-x 1) y) (loop x y (adj-x 1) y new-dist))
-                ((path-continues? (adj-x -1) y) (loop x y (adj-x -1) y new-dist))
-                ((path-continues? x (adj-y -1)) (loop x y x (adj-y -1) new-dist))
-                ((path-continues? x (adj-y 1)) (loop x y x (adj-y 1) new-dist))
-                ;; this should never happen if we have managed to find all
-                ;; the nodes correctly, but just in case...
-                (else (values 0 new-dist))))))
+      (cond (xy-node (values xy-node dist))
+            ((path-continues? (adj-x 1) y) (loop x y (adj-x 1) y new-dist))
+            ((path-continues? (adj-x -1) y) (loop x y (adj-x -1) y new-dist))
+            ((path-continues? x (adj-y -1)) (loop x y x (adj-y -1) new-dist))
+            ((path-continues? x (adj-y 1)) (loop x y x (adj-y 1) new-dist))
+            ;; this should never happen if we have managed to find all
+            ;; the nodes correctly, but just in case...
+            (else (values 0 new-dist)))))
   (define (make-navcell-lst x y)
     (define (make-fingerpost-lst)
       (let loop ((offset-lst '((right 1 0) (left -1 0) (up 0 -1) (down 0 1))))
@@ -109,25 +112,41 @@
   (define navgrid (list->immutable-vector (make-navcell-lst 0 0)))
   ;; Floyd Warshall algo to get grid of shortest dists between nodes
   (define dist-vector (make-vector (sqr number-of-nodes)
-                                   (make-shortcut 'none infinity)))
-  (define (set-dist! node1 node2 direction distance)
-    (vector-set! dist-vector (+ (node-id node1)
-                                (* (node-id node2) number-of-nodes))
-                 (make-shortcut direction distance)))
-  (define (dist node1 node2)
-    (shortcut-distance
-     (vector-ref dist-vector (+ (node-id node1)
-                                (* (node-id node2) number-of-nodes)))))
-  (define (dir node1 node2)
-    (shortcut-direction
-     (vector-ref dist-vector (+ (node-id node1)
-                                (* (node-id node2) number-of-nodes)))))
+                                   (list unassigned-shortcut
+                                         unassigned-shortcut)))
+  (define (dist-offset node1 node2)
+    (+ (node-id node1) (* (node-id node2) number-of-nodes)))
+  (define (dist-ref node1 node2)
+    (vector-ref dist-vector (dist-offset node1 node2)))
+  (define (dist-ref-rank rank node1 node2)
+    (cond ((= rank 1) (car (dist-ref node1 node2)))
+                      (else (cadr (dist-ref node1 node2)))))
+  (define (set-dist! rank node1 node2 direction distance via)
+    (define current (dist-ref node1 node2))
+    (define new-shortcut (make-shortcut direction distance via))
+    (vector-set! dist-vector
+                 (dist-offset node1 node2)
+                 (cond ((= rank 1) (list new-shortcut (cadr current)))
+                       (else (list (car current) new-shortcut)))))
+  (define (relegate-dist! node1 node2)
+    (define current-first (dist-ref-rank 1 node1 node2))
+    (vector-set! dist-vector
+                 (dist-offset node1 node2)
+                 (list current-first current-first)))
+  (define (dist rank node1 node2)
+    (shortcut-distance (dist-ref-rank rank node1 node2)))
+  (define (dir rank node1 node2)
+    (shortcut-direction (dist-ref-rank rank node1 node2)))
+  (define (via rank node1 node2)
+    (shortcut-via (dist-ref-rank rank node1 node2)))
   (define (set-direct-node-dists! n)
-    (set-dist! n n 'none 0)
-    (for-each (lambda (fp) (set-dist! n
+    (set-dist! 1 n n 'none 0 #f)
+    (for-each (lambda (fp) (set-dist! 1
+                                      n
                                       (fingerpost-node fp)
                                       (fingerpost-direction fp)
-                                      (fingerpost-distance fp)))
+                                      (fingerpost-distance fp)
+                                      n))
               (vector-ref navgrid (+ (node-x n) (* (node-y n) width)))))
   (for-each set-direct-node-dists! nodes)
   (define shortest-dists
@@ -136,13 +155,22 @@
             ((null? i) (loop (cdr k) nodes nodes))
             ((null? k) (cons number-of-nodes
                              (vector->immutable-vector dist-vector)))
+            ((or (eq? (car i) (car j)) (eq? (car k) (car j))) (loop k i (cdr j)))
+            ((eq? (car i) (car k)) (loop k (cdr i) nodes))
             (else
-             (let ((ni (car i))
-                   (nj (car j))
-                   (nk (car k)))
-               (when (> (dist ni nj) (+ (dist ni nk) (dist nk nj)))
-                 (set-dist! ni nj (dir ni nk) (+ (dist ni nk) (dist nk nj))))
-               (loop k i (cdr j)))))))
+             (let* ((ni (car i))
+                    (nj (car j))
+                    (nk (car k))
+                    (dist-thru-k (+ (dist 1 ni nk) (dist 1 nk nj)))
+                    (via-thru-k (via 1 nk nj)))
+               (cond ((> (dist 1 ni nj) dist-thru-k) ; shorter than current shortest?
+                      (when (not (eq? via-thru-k (via 1 ni nj)))
+                        (relegate-dist! ni nj))
+                      (set-dist! 1 ni nj (dir 1 ni nk) dist-thru-k via-thru-k))
+                     ((and (> (dist 2 ni nj) dist-thru-k)
+                           (not (eq? via-thru-k (via 1 ni nj)))) ; shorter than current second shortest?
+                      (set-dist! 2 ni nj (dir 1 ni nk) dist-thru-k via-thru-k))))
+               (loop k i (cdr j))))))
   (maze width height grid nodes navgrid shortest-dists))
 
 (define (maze-cell maze x y)
@@ -168,8 +196,32 @@
 (define (navcell maze x y)
   (vector-ref (maze-navgrid maze) (+ x (* y (maze-width maze)))))
 
-(define (shortest maze node1 node2)
+(define (shortest maze node1 node2 excl-via)
   (define number-of-nodes (car (maze-shortest-dists maze)))
   (define dist-vector (cdr (maze-shortest-dists maze)))
-  (vector-ref dist-vector (+ (node-id node1)
-                             (* (node-id node2) number-of-nodes))))
+  (define shortest-lst (vector-ref dist-vector (+ (node-id node1)
+                                                  (* (node-id node2) number-of-nodes))))
+  (if (eq? (shortcut-via (car shortest-lst)) excl-via)
+      (cadr shortest-lst)
+      (car shortest-lst)))
+
+(define (display-shortest-dists maze)
+  (define number-of-nodes (car (maze-shortest-dists maze)))
+  (define dist-vector (cdr (maze-shortest-dists maze)))
+  (let loop ((n1 0) (n2 0))
+    (cond ((= n2 number-of-nodes) (newline))
+          ((= n1 number-of-nodes) (loop 0 (+ n2 1)))
+          (else
+            (define scl (vector-ref dist-vector (+ n1 (* n2 number-of-nodes))))
+            (printf "(~a,~a) ~a:~a:~a ~a:~a:~a~n"
+                    n1
+                    n2
+                    (shortcut-direction (car scl))
+                    (shortcut-distance (car scl))
+                    (shortcut-via (car scl))
+                    (shortcut-direction (cadr scl))
+                    (shortcut-distance (cadr scl))
+                    (shortcut-via (cadr scl)))
+            (loop (+ n1 1) n2)))))
+
+
