@@ -2,7 +2,8 @@
 
 ;; plenty mutation
 
-(require "maze.rkt"
+(require "common.rkt"
+         "maze.rkt"
          "movement.rkt")
 
 (provide make-maze-state
@@ -26,16 +27,14 @@
   (+ (maze-count maze 'dot) (maze-count maze 'powerpill)))
   
 (define (make-maze-state maze)
-  (list (maze->vector maze)
+  (list (maze->2dvect maze)
         (maze-width maze)
         (maze-height maze)
         (box (eatables maze))))
 
-(define (maze-index maze-state x y) (+ (* y (cadr maze-state)) x))
-
 (define (cell-state maze-state x y)
   (if (and (>= x 0) (< x (cadr maze-state)) (>= y 0) (< y (caddr maze-state)))
-      (vector-ref (car maze-state) (maze-index maze-state x y))
+      (2dvect-ref (car maze-state) x y)
       'gap))
 
 (define (eatables-left maze-state) (unbox (cadddr maze-state)))
@@ -48,7 +47,7 @@
     (let ((content (cell-state maze-state x y)))
       (if (eatable? content)
           (begin
-            (vector-set! (car maze-state) (maze-index maze-state x y) 'gap)
+            (2dvect-set! (car maze-state) x y 'gap)
             (set-box! (cadddr maze-state) (- (unbox (cadddr maze-state)) 1))
             content)
           #f)))

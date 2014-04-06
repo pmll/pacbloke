@@ -29,13 +29,10 @@
   (define frame-number 0)
   (define ghost-score! (make-ghost-bounty 200))
   (define maze-frame (new frame% (label "Pacbloke")))
-  (define score-canvas (new canvas% (parent maze-frame)
-                                    (paint-callback
-                                      (lambda (c dc)
-                                        (render-score c
-                                                      dc
-                                                      (lives! 0)
-                                                      (score! 0))))))
+  (define score-canvas
+    (new canvas% (parent maze-frame)
+                 (paint-callback (lambda (c dc)
+                                   (render-score c dc (lives! 0) (score! 0))))))
   (define maze-canvas
     (new game-canvas% (parent maze-frame)
                       (paint-callback (lambda (c dc) (render-maze c maze)))))
@@ -49,9 +46,9 @@
               ghost-lst)
     (when debug
           (for-each (lambda (g) (unrender (node-x (target-node (ghost-target g)))
-                                         (node-y (target-node (ghost-target g)))
-                                         maze-dc
-                                         maze-state))
+                                          (node-y (target-node (ghost-target g)))
+                                          maze-dc
+                                          maze-state))
                     ghost-lst)))
   (define (render-player player)
     (render-bloke (roamer-x player)

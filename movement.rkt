@@ -15,7 +15,8 @@
          (struct-out ghost)
          (struct-out target))
  
-(require "maze.rkt")
+(require "maze.rkt"
+         "common.rkt")
 
 (define player-speed 5)
 
@@ -39,11 +40,12 @@
 ;; at some point as it travels through it
 (define-struct roamer (x y speed direction next-direction blocked-by next-speed))
 
+(define-struct shortcut (direction distance))
+
 (define-struct target (node not-via))
 
 (define (target-eq? t1 t2)
-  (and (eq? (target-node t1) (target-node t2))
-       (eq? (target-not-via t1) (target-not-via t2))))
+  (and (fnof eq? target-node t1 t2) (fnof eq? target-not-via t1 t2)))
 
 (define-struct ghost (roamer id mode flee-frame home-x home-y target))
 
@@ -232,20 +234,19 @@
                            (else snap-coord))
                      (roamer-y (ghost-roamer g)))
                     (maze-height maze)))
-  (let loop ((fp-lst (navcell maze x y)) (shortest-cut unassigned-shortcut))
+  (let loop ((fp-lst (navcell maze x y)) (shortest-cut (make-shortcut 'none infinity)))
     (cond ((null? fp-lst) shortest-cut)
           (else
             (define fp (car fp-lst))
             (define dist (+ (fingerpost-distance fp)
-                            (shortcut-distance (shortest maze
-                                                         (fingerpost-node fp)
-                                                         (target-node tgt)
-                                                         (target-not-via tgt)))))
+                            (shortest maze
+                                      (fingerpost-node fp)
+                                      (target-node tgt)
+                                      (target-not-via tgt))))
             (if (and (< dist (shortcut-distance shortest-cut))
                      (not (opposite-direction? direction (fingerpost-direction fp))))
                 (loop (cdr fp-lst) (make-shortcut (fingerpost-direction fp)
-                                                  dist
-                                                  #f))
+                                                  dist))
                 (loop (cdr fp-lst) shortest-cut))))))
 
 (define (acquired-target? g)
@@ -298,17 +299,15 @@
   (define (closest-ghost ghost-lst tgt)
     (let loop ((ghost-lst ghost-lst)
                (cghost #f)
-               (shortest-cut unassigned-shortcut))
+               (shortest-cut (make-shortcut 'none infinity)))
       (cond ((null? ghost-lst)
              (if cghost (struct-copy ghost cghost (target tgt)) #f))
             (else
               (let ((ghost-sc (ghost-shortcut (car ghost-lst) tgt maze)))
-                (if (< (shortcut-distance ghost-sc)
-                       (shortcut-distance shortest-cut))
+                (if (fnof < shortcut-distance ghost-sc shortest-cut)
                     (loop (cdr ghost-lst) (car ghost-lst) ghost-sc)
                     (loop (cdr ghost-lst) cghost shortest-cut)))))))
-  (define (ghost-eq? ghost1 ghost2)
-    (= (ghost-id ghost1) (ghost-id ghost2)))
+  (define (ghost-eq? ghost1 ghost2) (fnof = ghost-id ghost1 ghost2))
   (define (targets-not-assigned target-nodes ghost-lst)
     (define (target-not-assigned tgt)
       (not (ormap (lambda (g) (target-eq? (ghost-target g) tgt)) ghost-lst)))
