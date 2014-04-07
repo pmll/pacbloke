@@ -4,7 +4,8 @@
 
 (provide traditional-maze
          mini-trad-maze
-         example-maze)
+         example-maze
+         easy-maze)
 
 (require "maze.rkt")
 
@@ -84,3 +85,15 @@
                    "@.@.@@.@.@"
                    "@........@"
                    "@@@@@@@@@@")))
+
+(define easy-maze
+  (make-maze 16
+             7
+             (list "@@@@@@@@@@@@@@@@"
+                   "@GGGGGG        @"
+                   "@@@@@@@@@@@@@ @@"
+                   "@              @"
+                   "@@ @@@@@@@@@@@@@"
+                   "@  ...........P@"
+                   "@@@@@@@@@@@@@@@@")))
+

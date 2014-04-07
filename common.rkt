@@ -26,7 +26,7 @@
 
 (define (2dvect-memq item v)
   (define pos (vector-memq item (caddr v)))
-  (cond (pos (values (remainder pos (car v)) (quotient pos (cadr v))))
+  (cond (pos (values (remainder pos (car v)) (quotient pos (car v))))
         (else (values #f #f))))
 
 (define (2dvect-count item v)

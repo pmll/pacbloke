@@ -10,7 +10,7 @@
          "state.rkt"
          "maze.rkt")
 
-(define debug #t)
+(define debug #f)
 
 (define frame-interval 50)
 ;(define frame-interval 250)
@@ -20,15 +20,15 @@
     (define/override (on-char keyevent)
       (set-last-input! (send keyevent get-key-code)))
     (super-new)))
-
-(define (play-maze score! lives! maze-lst)
+  
+(define (play-maze score! lives! maze-lst frame-x frame-y)
   (define maze (car maze-lst))
   (define maze-state (make-maze-state maze))
   (define player (make-player maze))
   (define ghost-lst (make-ghosts maze))
   (define frame-number 0)
   (define ghost-score! (make-ghost-bounty 200))
-  (define maze-frame (new frame% (label "Pacbloke")))
+  (define maze-frame (new frame% (label "Pacbloke") (x frame-x) (y frame-y)))
   (define score-canvas
     (new canvas% (parent maze-frame)
                  (paint-callback (lambda (c dc)
@@ -123,7 +123,11 @@
             (send ticker stop)
             (sleep 1)
             (send maze-frame show #f)
-            (play-maze score! lives! (append (cdr maze-lst) (list maze))))))
+            (play-maze score!
+                       lives!
+                       (append (cdr maze-lst) (list maze))
+                       (send maze-frame get-x)
+                       (send maze-frame get-y)))))
   ;; eat ghosts which involves displaying a score with a pause
   (define (eat-ghosts caught)
     (send ticker stop)
@@ -177,6 +181,8 @@
                       (consume-last-input!)
                       ;; really quit? dialogue here
                       )
+                     ((eq? (last-input) 'pause)
+                      #f)
                      ((player-caught? player ghost-lst) (player-death))
                      ((not (null? ghosts-captured)) (eat-ghosts ghosts-captured))
                      (else (play-frame))))))
@@ -184,9 +190,11 @@
   (send maze-frame show #t)
   (send maze-canvas focus)
   (when debug (display-shortest-dists maze))
-  (display "playing a maze") (newline))
+  (printf "playing a maze @ ~a,~a~n" frame-x frame-y))
 
 (play-maze (make-scorer 0)
            (make-scorer 3)
-           (list mini-trad-maze example-maze traditional-maze))
+           (list mini-trad-maze)
+           #f
+           #f)
 

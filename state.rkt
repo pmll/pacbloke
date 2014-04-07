@@ -80,8 +80,10 @@
                        ('down 'down)
                        ('left 'left)
                        ('right 'right)
-                       ((#\q) 'quit)
-                       ((#\s) 'togglesound)
+                       ((#\q #\Q) 'quit)
+                       ((#\s #\S) 'togglesound)
+                       ((#\p #\P) (if (eq? *last-input* 'pause) 'restart 'pause))
+                       ((#\r #\R) 'restart)
                        (else *last-input*))))
 
 (define (last-input) *last-input*)
