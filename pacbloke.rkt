@@ -21,21 +21,34 @@
       (set-last-input! (send keyevent get-key-code)))
     (super-new)))
   
-(define (play-maze score! lives! maze-lst frame-x frame-y)
+(define main-frame (new frame% (label "Pacbloke")))
+
+(define (clear-main-frame-canvases)
+  (for-each (lambda (c) (send main-frame delete-child c))
+            (send main-frame get-children)))
+
+(define (resize-main-frame)
+  (define child-canvases (send main-frame get-children))
+  (send main-frame resize (foldl max 0 (map (lambda (c) (send c get-x))
+                                            child-canvases))
+                          (foldl + 0 (map (lambda (c) (send c get-y))
+                                          child-canvases))))
+
+(define (play-maze score! lives! maze-lst)
   (define maze (car maze-lst))
   (define maze-state (make-maze-state maze))
   (define player (make-player maze))
   (define ghost-lst (make-ghosts maze))
   (define frame-number 0)
   (define ghost-score! (make-ghost-bounty 200))
-  (define maze-frame (new frame% (label "Pacbloke") (x frame-x) (y frame-y)))
   (define score-canvas
-    (new canvas% (parent maze-frame)
+    (new canvas% (parent main-frame)
                  (paint-callback (lambda (c dc)
                                    (render-score c dc (lives! 0) (score! 0))))))
   (define maze-canvas
-    (new game-canvas% (parent maze-frame)
+    (new game-canvas% (parent main-frame)
                       (paint-callback (lambda (c dc) (render-maze c maze)))))
+  (resize-main-frame)
   (define maze-dc (send maze-canvas get-dc))
   (define (unrender-all-roamers player ghost-lst)
     (unrender (roamer-x player) (roamer-y player) maze-dc maze-state)
@@ -77,19 +90,20 @@
     (send ticker stop)
     (render-lose-life)
     (sleep 2)
-    (if (> (lives! -1) 0)
-        (let ((new-player (make-player maze))
-              (new-ghost-lst (make-ghosts maze)))
-          (send maze-canvas suspend-flush)
-          (unrender-all-roamers player ghost-lst)
-          (render-all-roamers new-player new-ghost-lst)
-          (send maze-canvas resume-flush)
-          (send maze-canvas flush)
-          (send score-canvas refresh)
-          (set! player new-player)
-          (set! ghost-lst new-ghost-lst)
-          (send ticker start frame-interval))
-        (send maze-frame show #f)))
+    (cond ((>= (lives! -1) 0)
+           (let ((new-player (make-player maze))
+                 (new-ghost-lst (make-ghosts maze)))
+             (send maze-canvas suspend-flush)
+             (unrender-all-roamers player ghost-lst)
+             (render-all-roamers new-player new-ghost-lst)
+             (send maze-canvas resume-flush)
+             (send maze-canvas flush)
+             (send score-canvas refresh)
+             (set! player new-player)
+             (set! ghost-lst new-ghost-lst)
+             (send ticker start frame-interval)))
+          (else (clear-main-frame-canvases)
+                (title))))
   ;; update a normal gameplay frame
   (define (play-frame)
     (let* ((new-player (player-movement player (if (last-input-a-direction?) (last-input) #f) maze))
@@ -122,12 +136,10 @@
       (when (zero? (eatables-left maze-state))
             (send ticker stop)
             (sleep 1)
-            (send maze-frame show #f)
+            (clear-main-frame-canvases)
             (play-maze score!
                        lives!
-                       (append (cdr maze-lst) (list maze))
-                       (send maze-frame get-x)
-                       (send maze-frame get-y)))))
+                       (append (cdr maze-lst) (list maze))))))
   ;; eat ghosts which involves displaying a score with a pause
   (define (eat-ghosts caught)
     (send ticker stop)
@@ -176,9 +188,10 @@
            (lambda ()
              (let ((ghosts-captured (ghosts-caught player ghost-lst)))
                (cond ((eq? (last-input) 'quit)
-                      (send maze-frame show #f)
-                      (send ticker stop)
                       (consume-last-input!)
+                      (send ticker stop)
+                      (clear-main-frame-canvases)
+                      (title)
                       ;; really quit? dialogue here
                       )
                      ((eq? (last-input) 'pause)
@@ -187,14 +200,44 @@
                      ((not (null? ghosts-captured)) (eat-ghosts ghosts-captured))
                      (else (play-frame))))))
          (interval frame-interval)))
-  (send maze-frame show #t)
   (send maze-canvas focus)
   (when debug (display-shortest-dists maze))
-  (printf "playing a maze @ ~a,~a~n" frame-x frame-y))
+  (printf "playing a maze~n"))
 
-(play-maze (make-scorer 0)
-           (make-scorer 3)
-           (list mini-trad-maze)
-           #f
-           #f)
 
+(define (title)
+  (define title-canvas%
+    (class canvas%
+      (define/override (on-char keyevent)
+        (case (send keyevent get-key-code)
+          ((#\p #\P) (begin
+                       (clear-main-frame-canvases)
+                       (consume-last-input!)
+                       (play-maze (make-scorer 0)
+                       (make-scorer 2)
+                       (list traditional-maze easy-maze mini-trad-maze))))
+          ((#\q #\Q) (send main-frame show #f))))
+
+      (super-new)))
+  (define title-canvas
+    (new title-canvas% (parent main-frame)
+                       (min-width 500)
+                       (min-height 500)
+                       (paint-callback (lambda (c dc)
+                         (send dc set-background "Black")
+                         (send dc set-text-foreground "White")
+                         (send dc set-font (make-object font% 20
+                                                        'modern
+                                                        'normal
+                                                        'bold
+                                                        #f
+                                                        'default
+                                                        #t
+                                                        'aligned))
+                         (send dc clear)
+                         (send dc draw-text "'p' to play, 'q' to quit..." 5 5)))))
+  (resize-main-frame)
+  (send title-canvas focus))
+
+(send main-frame show #t)
+(title)
