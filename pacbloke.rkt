@@ -10,7 +10,7 @@
          "state.rkt"
          "maze.rkt")
 
-(define debug #f)
+(define debug #t)
 
 (define frame-interval 50)
 ;(define frame-interval 250)
@@ -187,23 +187,23 @@
          (notify-callback
            (lambda ()
              (let ((ghosts-captured (ghosts-caught player ghost-lst)))
-               (cond ((eq? (last-input) 'quit)
+               (cond ((and (eq? (last-input) 'quit)
+                           (eq? (message-box "Really Quit?"
+                                             "Quit this game?"
+                                             main-frame
+                                             '(yes-no))
+                                'yes))
                       (consume-last-input!)
                       (send ticker stop)
                       (clear-main-frame-canvases)
-                      (title)
-                      ;; really quit? dialogue here
-                      )
-                     ((eq? (last-input) 'pause)
-                      #f)
+                      (title))
+                     ((eq? (last-input) 'pause) #f)
                      ((player-caught? player ghost-lst) (player-death))
                      ((not (null? ghosts-captured)) (eat-ghosts ghosts-captured))
                      (else (play-frame))))))
          (interval frame-interval)))
   (send maze-canvas focus)
-  (when debug (display-shortest-dists maze))
-  (printf "playing a maze~n"))
-
+  (when debug (display-shortest-dists maze)))
 
 (define (title)
   (define title-canvas%
@@ -214,8 +214,8 @@
                        (clear-main-frame-canvases)
                        (consume-last-input!)
                        (play-maze (make-scorer 0)
-                       (make-scorer 2)
-                       (list traditional-maze easy-maze mini-trad-maze))))
+                                  (make-scorer 2)
+                                  (list mini-trad-maze traditional-maze))))
           ((#\q #\Q) (send main-frame show #f))))
 
       (super-new)))

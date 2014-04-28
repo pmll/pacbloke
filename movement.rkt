@@ -74,6 +74,8 @@
                  (loop (+ x 1) y (+ id 1))))
           (else (loop (+ x 1) y id)))))
 
+(define (cell-aligned? x y) (and (integer? x) (integer? y)))
+
 (define (next-position maze x y direction speed)
   (cond ((eq? direction 'up) 
          (values x (clock-number (- y (/ 1 speed)) (maze-height maze))))
@@ -109,7 +111,7 @@
 
 (define (realise-direction maze r)
   (let ((next-direction (roamer-next-direction r)))
-    (if next-direction
+    (if (and next-direction (cell-aligned? (roamer-x r) (roamer-y r)))
         (let-values (((next-x next-y)
                       (next-position maze
                                      (roamer-x r)
@@ -132,8 +134,7 @@
           (struct-copy roamer r (x next-x)
                                 (y next-y)
                                 (speed (if (and next-speed
-                                                (integer? next-x)
-                                                (integer? next-y))
+                                                (cell-aligned? next-x next-y))
                                            next-speed
                                            (roamer-speed r))))
           r))))
@@ -161,8 +162,31 @@
                 (>= (- frame-number (ghost-flee-frame g)) scared-ghost-frames))
            (become-bold g))
           (else g)))
+  (define (gle v1 v2 v3 v4 v5)
+    (and (> v2 v1) (< v2 v3) (= v4 v5)))
+  (define (ghost-in-bubble? g1 g2)
+    (define r1 (ghost-roamer g1))
+    (define r2 (ghost-roamer g2))
+    (define d1 (roamer-direction r1))
+    (define d2 (roamer-direction r2))
+    (define x1 (roamer-x r1))
+    (define x2 (roamer-x r2))
+    (define y1 (roamer-y r1))
+    (define y2 (roamer-y r2))
+    (and (not (opposite-direction? d1 d2))
+         (or (and (= x1 x2)
+                  (= y1 y2)
+                  (< (ghost-id g1) (ghost-id g2)))
+             (and (eq? d1 'left) (gle (- x1 1) x2 x1 y1 y2))
+             (and (eq? d1 'right) (gle x1 x2 (+ x1 1) y1 y2))
+             (and (eq? d1 'up) (gle (- y1 1) y2 y1 x1 x2))
+             (and (eq? d1 'down) (gle y1 y2 (+ y1 1) x1 x2)))))
+  (define (right-of-way? g)
+    (not (ormap (lambda (h) (ghost-in-bubble? g h)) ghost-lst)))
   (define (move-ghost g)
-    (struct-copy ghost g (roamer (realise-motion maze (ghost-roamer g)))))
+    (if (right-of-way? g)
+        (struct-copy ghost g (roamer (realise-motion maze (ghost-roamer g))))
+        g))
   (map (lambda (g) (move-ghost (follow-mission (transform-ghost g) maze)))
        (assign-missions player-x player-y ghost-lst maze)))
 
