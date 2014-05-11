@@ -12,6 +12,7 @@
          unrender
          render-ghost-score
          unrender-ghost-score
+         render-title
          render-ghost-eaten
          render-lose-life)
 
@@ -226,6 +227,57 @@
                          (loop (+ life 1))))
   (send score-dc draw-text (format "~a" score) (* 10 cell-size) 5))
 
+(define (render-title title-canvas)
+  (define title-dc (send title-canvas get-dc))
+  (send title-canvas min-height 460)
+  (send title-canvas min-width 460)
+  (send title-dc set-background "Black")
+  (send title-dc set-text-foreground "White")
+  (send title-dc set-font (make-object font% 20
+                                             'modern
+                                             'normal
+                                             'bold
+                                             #f
+                                             'default
+                                             #t
+                                             'aligned))
+  (send title-dc clear)
+  (send title-dc draw-text "PACBLOKE" 181 5)
+  (send title-dc draw-bitmap bloke-ajar-right 139 40 'solid player-colour)
+  (send title-dc draw-bitmap dot 159 40 'solid dot-colour)
+  (send title-dc draw-bitmap dot 179 40 'solid dot-colour)
+  (send title-dc draw-bitmap dot 199 40 'solid dot-colour)
+  (send title-dc draw-bitmap dot 219 40 'solid dot-colour)
+  (send title-dc draw-bitmap dot 239 40 'solid dot-colour)
+  (send title-dc draw-bitmap dot 259 40 'solid dot-colour)
+  (send title-dc draw-bitmap dot 279 40 'solid dot-colour)
+  (send title-dc draw-bitmap bloke-ajar-left 299 40 'solid player-colour)
+  (send title-dc draw-text "Eat This" 10 80)
+  (send title-dc draw-text "Get" 170 80)
+  (send title-dc draw-bitmap dot 10 110 'solid dot-colour)
+  (send title-dc draw-text "10 Points" 170 110)
+  (send title-dc draw-bitmap pill 10 140 'solid powerpill-colour)
+  (send title-dc draw-text "50 Points" 170 140)
+  (send title-dc draw-bitmap scared-ghost 10 170 'solid scaredghost-colour)
+  (send title-dc draw-bitmap scared-ghost 40 170 'solid scaredghost-colour)
+  (send title-dc draw-bitmap scared-ghost 70 170 'solid scaredghost-colour)
+  (send title-dc draw-bitmap scared-ghost 100 170 'solid scaredghost-colour)
+  (send title-dc draw-text "200/400/800/1600 Points" 170 170)
+  (send title-dc draw-bitmap ghost 10 200 'solid ghost1-colour)
+  (send title-dc draw-text "DEAD" 170 200)
+  (send title-dc draw-bitmap ghost 10 230 'solid ghost2-colour)
+  (send title-dc draw-text "DEAD" 170 230)
+  (send title-dc draw-bitmap ghost 10 260 'solid ghost3-colour)
+  (send title-dc draw-text "DEAD" 170 260)
+  (send title-dc draw-bitmap ghost 10 290 'solid ghost4-colour)
+  (send title-dc draw-text "DEAD" 170 290)
+  (send title-dc draw-text "Move using the arrow keys" 10 330)
+  (send title-dc draw-text "'P' to play / pause" 10 360)
+  (send title-dc draw-text "'S' to toggle sound" 10 390)
+  (send title-dc draw-text "'Q' to quit" 10 420)
+  (send title-dc set-text-foreground "Red")
+  (send title-dc draw-text (if (sound-on?) "On" "Off") 260 390))
+
 ;; sounds are part of the game display in my world...
 (define (sound-effect sound-file)
   (when (and (sound-on?) (file-exists? sound-file))
@@ -242,6 +294,4 @@
 
 (define (render-lose-life)
   (sound-effect "loselife.wav"))
-
-
 

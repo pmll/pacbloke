@@ -10,7 +10,7 @@
          "state.rkt"
          "maze.rkt")
 
-(define debug #t)
+(define debug #f)
 
 (define frame-interval 50)
 ;(define frame-interval 250)
@@ -216,26 +216,13 @@
                        (play-maze (make-scorer 0)
                                   (make-scorer 2)
                                   (list mini-trad-maze traditional-maze))))
+          ((#\s #\S) (begin (toggle-sound!) (send title-canvas refresh)))
           ((#\q #\Q) (send main-frame show #f))))
 
       (super-new)))
   (define title-canvas
     (new title-canvas% (parent main-frame)
-                       (min-width 500)
-                       (min-height 500)
-                       (paint-callback (lambda (c dc)
-                         (send dc set-background "Black")
-                         (send dc set-text-foreground "White")
-                         (send dc set-font (make-object font% 20
-                                                        'modern
-                                                        'normal
-                                                        'bold
-                                                        #f
-                                                        'default
-                                                        #t
-                                                        'aligned))
-                         (send dc clear)
-                         (send dc draw-text "'p' to play, 'q' to quit..." 5 5)))))
+                       (paint-callback (lambda (c dc) (render-title c)))))
   (resize-main-frame)
   (send title-canvas focus))
 
