@@ -12,16 +12,25 @@
          maze-member
          maze-count
          maze->2dvect
-         shortest
+         cell-to-node-shortest
+         longest-shortway
          display-shortest-dists
          (struct-out node)
-         (struct-out fingerpost))
+         (struct-out fingerpost)
+         (struct-out shortway))
 
 (define-struct node (id x y))
 
 (define-struct fingerpost (node direction distance))
 
 (define-struct shortcut (distance via))
+
+(define-struct shortway (direction distance))
+
+(define (longest-shortway sw-lst)
+  (foldl (lambda (sw1 sw2) (if (fnof > shortway-distance sw1 sw2) sw1 sw2))
+         (make-shortway 'none 0)
+         sw-lst))
 
 (define unassigned-shortcut (make-shortcut infinity #f))
 
@@ -188,13 +197,30 @@
 
 (define (navcell maze x y) (2dvect-ref (maze-navgrid maze) x y))
 
-(define (shortest maze node1 node2 not-via)
+(define (node-to-node-shortest maze node1 node2 not-via)
   (define shortest-lst (2dvect-ref (maze-shortest-dists maze)
                                    (node-id node1)
                                    (node-id node2)))
   (cond ((eq? (shortcut-via (car shortest-lst)) not-via)
          (shortcut-distance (cadr shortest-lst)))
         (else (shortcut-distance (car shortest-lst)))))
+
+(define (cell-to-node-shortest maze x y node not-via not-direction)
+  (let loop ((fp-lst (navcell maze x y)) (shortest-way (make-shortway 'none infinity)))
+    (cond ((null? fp-lst) shortest-way)
+          (else 
+            (define fp (car fp-lst))
+            (define dist (+ (fingerpost-distance fp)
+                            (node-to-node-shortest maze
+                                                   (fingerpost-node fp)
+                                                   node
+                                                   not-via)))
+            (define direction (fingerpost-direction fp))
+            (loop (cdr fp-lst)
+                  (if (or (eq? direction not-direction)
+                          (>= dist (shortway-distance shortest-way)))
+                      shortest-way
+                      (make-shortway direction dist)))))))
 
 (define (display-shortest-dists maze)
   (define number-of-nodes (car (maze-shortest-dists maze)))

@@ -10,13 +10,14 @@
          player-caught?
          ghosts-caught
          back-to-base
-         change-direction
          (struct-out roamer)
          (struct-out ghost)
          (struct-out target))
  
 (require "maze.rkt"
          "common.rkt")
+
+(define null-node (make-node 0 0 0))
 
 (define player-speed 5)
 
@@ -39,8 +40,6 @@
 ;; that way, the object in question is guaranteed to exactly align with a cell
 ;; at some point as it travels through it
 (define-struct roamer (x y speed direction next-direction blocked-by next-speed))
-
-(define-struct shortcut (direction distance))
 
 (define-struct target (node not-via))
 
@@ -76,6 +75,17 @@
 
 (define (cell-aligned? x y) (and (integer? x) (integer? y)))
 
+(define (opposite-direction direction)
+  (case direction
+    ('up 'down)
+    ('down 'up)
+    ('left 'right)
+    ('right 'left)
+    (else #f)))
+
+(define (opposite-direction? dir1 dir2)
+  (eq? (opposite-direction dir1) dir2))
+
 (define (next-position maze x y direction speed)
   (cond ((eq? direction 'up) 
          (values x (clock-number (- y (/ 1 speed)) (maze-height maze))))
@@ -106,6 +116,8 @@
 (define (change-direction r direction)
   (struct-copy roamer r (next-direction direction)))
 
+;; in order to ensure that the roamer always aligns with a cell as it passes
+;; through, speed changes must also be queued and applied when convenient
 (define (change-speed r new-speed)
   (struct-copy roamer r (next-speed new-speed)))
 
@@ -119,39 +131,45 @@
                                      next-direction 
                                      (roamer-speed r))))
           (if (can-occupy-coordinates? maze next-x next-y (roamer-blocked-by r))
-              (struct-copy roamer r (direction next-direction))
+              (struct-copy roamer r (direction next-direction)
+                                    (next-direction #f))
               r))
         r)))
 
-(define (continue-motion maze r)
-  (let ((next-speed (roamer-next-speed r)))
-    (let-values (((next-x next-y) (next-position maze
-                                                 (roamer-x r)
-                                                 (roamer-y r)
-                                                 (roamer-direction r)
-                                                 (roamer-speed r))))
-      (if (can-occupy-coordinates? maze next-x next-y (roamer-blocked-by r))
-          (struct-copy roamer r (x next-x)
-                                (y next-y)
-                                (speed (if (and next-speed
-                                                (cell-aligned? next-x next-y))
-                                           next-speed
-                                           (roamer-speed r))))
-          r))))
+(define (realise-speed r)
+  (if (and (roamer-next-speed r) (cell-aligned? (roamer-x r) (roamer-y r)))
+      (struct-copy roamer r (speed (roamer-next-speed r))
+                            (next-speed #f))
+      r))
 
 (define (realise-motion maze r)
-  (continue-motion maze (realise-direction maze r)))
+  (define new-r (realise-speed (realise-direction maze r)))
+  (let-values (((next-x next-y) (next-position maze
+                                               (roamer-x new-r)
+                                               (roamer-y new-r)
+                                               (roamer-direction new-r)
+                                               (roamer-speed new-r))))
+    (if (can-occupy-coordinates? maze next-x next-y (roamer-blocked-by new-r))
+        (struct-copy roamer new-r (x next-x) (y next-y))
+        new-r)))
 
 (define (player-movement player direction-request maze)
-  (realise-motion maze
-                  (if direction-request 
-                      (change-direction player direction-request)
-                      player)))
+  (realise-motion maze (if direction-request 
+                           (change-direction player direction-request)
+                           player)))
+
+(define (filter-ghosts-by-mode ghost-lst mode)
+  (filter (lambda (g) (eq? (ghost-mode g) mode)) ghost-lst))
+
+(define (fleeing-ghosts ghost-lst) (filter-ghosts-by-mode ghost-lst 'fleeing))
+
+(define (chasing-ghosts ghost-lst) (filter-ghosts-by-mode ghost-lst 'chasing))
 
 (define (ghost-movement ghost-lst maze last-meal frame-number player-x player-y)
   (define (become-scared g)
     (struct-copy ghost g (flee-frame frame-number)
                          (mode 'fleeing)
+                         (target (make-target (make-node 0 0 0) (make-node 0 0 0)))
                          (roamer (change-speed (ghost-roamer g) scared-ghost-speed))))
   (define (become-bold g)
     (struct-copy ghost g (mode 'chasing)
@@ -187,8 +205,13 @@
     (if (right-of-way? g)
         (struct-copy ghost g (roamer (realise-motion maze (ghost-roamer g))))
         g))
-  (map (lambda (g) (move-ghost (follow-mission (transform-ghost g) maze)))
-       (assign-missions player-x player-y ghost-lst maze)))
+  (define transformed-ghosts (map transform-ghost ghost-lst))
+  (map move-ghost
+       (append
+         (map (lambda (g) (follow-mission g maze))
+              (assign-missions player-x player-y (chasing-ghosts transformed-ghosts) maze))
+         (map (lambda (g) (run-like-the-wind player-x player-y g maze))
+              (fleeing-ghosts transformed-ghosts)))))
 
 ;; provide a list of of ghost refs that have collided with our player
 (define (collisions player-x player-y ghost-lst mode)
@@ -235,43 +258,33 @@
 
 (define (snap-coord n) (floor (+ n (/ 1 2))))
 
-(define (opposite-direction? dir1 dir2)
-  (or (and (eq? dir1 'up) (eq? dir2 'down))
-      (and (eq? dir1 'down) (eq? dir2 'up))
-      (and (eq? dir1 'left) (eq? dir2 'right))
-      (and (eq? dir1 'right) (eq? dir2 'left))))
-
+(define (vantage-point r maze)
+  (define direction (roamer-direction r))
+  (values (modulo ((cond ((eq? direction 'left) floor)
+                         ((eq? direction 'right) ceiling)
+                         (else snap-coord))
+                   (roamer-x r))
+                  (maze-width maze))
+          (modulo ((cond ((eq? direction 'up) floor)
+                         ((eq? direction 'down) ceiling)
+                         (else snap-coord))
+                   (roamer-y r))
+                  (maze-height maze))))
+ 
 (define (zip lsts)
   (define remaining-lsts (filter (lambda (lst) (not (null? lst))) lsts))
   (cond ((null? remaining-lsts) '())
         (else (append (map car remaining-lsts) (zip (map cdr remaining-lsts))))))
 
-(define (ghost-shortcut g tgt maze)
+(define (ghost-shortway g tgt maze)
   (define direction (roamer-direction (ghost-roamer g)))
-  (define x (modulo ((cond ((eq? direction 'left) floor)
-                           ((eq? direction 'right) ceiling)
-                           (else snap-coord))
-                     (roamer-x (ghost-roamer g)))
-                    (maze-width maze)))
-  (define y (modulo ((cond ((eq? direction 'up) floor)
-                           ((eq? direction 'down) ceiling)
-                           (else snap-coord))
-                     (roamer-y (ghost-roamer g)))
-                    (maze-height maze)))
-  (let loop ((fp-lst (navcell maze x y)) (shortest-cut (make-shortcut 'none infinity)))
-    (cond ((null? fp-lst) shortest-cut)
-          (else
-            (define fp (car fp-lst))
-            (define dist (+ (fingerpost-distance fp)
-                            (shortest maze
-                                      (fingerpost-node fp)
-                                      (target-node tgt)
-                                      (target-not-via tgt))))
-            (if (and (< dist (shortcut-distance shortest-cut))
-                     (not (opposite-direction? direction (fingerpost-direction fp))))
-                (loop (cdr fp-lst) (make-shortcut (fingerpost-direction fp)
-                                                  dist))
-                (loop (cdr fp-lst) shortest-cut))))))
+  (let-values (((x y) (vantage-point (ghost-roamer g) maze)))
+    (cell-to-node-shortest maze
+                           x
+                           y
+                           (target-node tgt)
+                           (target-not-via tgt)
+                           (opposite-direction direction))))
 
 (define (acquired-target? g)
   (define tgt-node (if (ghost-target g) (target-node (ghost-target g)) #f))
@@ -295,7 +308,7 @@
                                   (direction-from-node (target-node tgt)
                                                        (target-not-via tgt)
                                                        maze)
-                                  (shortcut-direction (ghost-shortcut g 
+                                  (shortway-direction (ghost-shortway g 
                                                                       (ghost-target g) 
                                                                       maze)))))))
 
@@ -323,14 +336,14 @@
   (define (closest-ghost ghost-lst tgt)
     (let loop ((ghost-lst ghost-lst)
                (cghost #f)
-               (shortest-cut (make-shortcut 'none infinity)))
+               (shortest-way (make-shortway 'none infinity)))
       (cond ((null? ghost-lst)
              (if cghost (struct-copy ghost cghost (target tgt)) #f))
             (else
-              (let ((ghost-sc (ghost-shortcut (car ghost-lst) tgt maze)))
-                (if (fnof < shortcut-distance ghost-sc shortest-cut)
-                    (loop (cdr ghost-lst) (car ghost-lst) ghost-sc)
-                    (loop (cdr ghost-lst) cghost shortest-cut)))))))
+              (let ((ghost-sw (ghost-shortway (car ghost-lst) tgt maze)))
+                (if (fnof < shortway-distance ghost-sw shortest-way)
+                    (loop (cdr ghost-lst) (car ghost-lst) ghost-sw)
+                    (loop (cdr ghost-lst) cghost shortest-way)))))))
   (define (ghost-eq? ghost1 ghost2) (fnof = ghost-id ghost1 ghost2))
   (define (targets-not-assigned target-nodes ghost-lst)
     (define (target-not-assigned tgt)
@@ -356,3 +369,50 @@
                                                     (not (ghost-eq? chosen g))))
                                     unassigned-ghosts))))))
 
+;; ghost fleeing strategy - short termist
+;; just head for the direct node that is furthest away from the player
+(define (run-like-the-wind player-x player-y g maze)
+  (define px (modulo (snap-coord player-x) (maze-width maze)))
+  (define py (modulo (snap-coord player-y) (maze-height maze)))
+  (define (fingerpost-pair fp-lst)
+    (if (= (length fp-lst) 2)
+        (if (fnof < (compose node-id fingerpost-node) (car fp-lst) (cadr fp-lst))
+            (cons (car fp-lst) (cadr fp-lst))
+            (cons (cadr fp-lst) (car fp-lst)))
+        #f))
+  (let-values (((gx gy) (vantage-point (ghost-roamer g) maze)))
+    (define p-fp-pair (fingerpost-pair (navcell maze px py)))
+    (define g-fp-pair (fingerpost-pair (navcell maze gx gy)))
+    ;; may get false positives here where two edges share same node pairing
+    (define same-edge?
+      (and p-fp-pair
+           g-fp-pair
+           (fnof eq? fingerpost-node (car p-fp-pair) (car g-fp-pair))
+           (fnof eq? fingerpost-node (cdr p-fp-pair) (cdr g-fp-pair))))
+    ; generally, about turns are frowned upon in the ghost community
+    ; the exception to this rule is when a ghost finds that they are on the
+    ; same edge as the player
+    (define (dir-node-closer-to-ghost)
+      (if (fnof <= fingerpost-distance (car g-fp-pair) (car p-fp-pair))
+          (fingerpost-direction (car g-fp-pair))
+          (fingerpost-direction (cdr g-fp-pair))))
+    (define (fp-shortway fp)
+      (make-shortway (fingerpost-direction fp)
+                     (shortway-distance (cell-to-node-shortest maze
+                                                               px
+                                                               py
+                                                               (fingerpost-node fp)
+                                                               null-node 
+                                                               #f))))
+    (define opposite-dir
+      (opposite-direction (roamer-direction (ghost-roamer g))))
+    (define dir
+      (if same-edge?
+          (dir-node-closer-to-ghost)
+          (shortway-direction
+            (longest-shortway
+              (map fp-shortway
+                (filter (lambda (fp) (not (eq? (fingerpost-direction fp)
+                                               opposite-dir)))
+                        (navcell maze gx gy)))))))
+    (struct-copy ghost g (roamer (change-direction (ghost-roamer g) dir)))))
