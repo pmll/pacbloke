@@ -25,6 +25,8 @@
 
 (define scared-ghost-speed 10)
 
+(define returning-ghost-speed 2)
+
 (define min-collision-area (/ 1 10))
 
 (define scared-ghost-frames 100)
@@ -46,7 +48,7 @@
 (define (target-eq? t1 t2)
   (and (fnof eq? target-node t1 t2) (fnof eq? target-not-via t1 t2)))
 
-(define-struct ghost (roamer id mode flee-frame home-x home-y target))
+(define-struct ghost (roamer id mode flee-frame home-node target))
 
 (define (make-player maze)
   (let-values (((x y) (maze-member maze 'player)))
@@ -59,19 +61,13 @@
                  #f)))
           
 (define (make-ghosts maze)
-  (let loop ((x 0) (y 0) (id 1))
-    (cond ((= y (maze-height maze)) '())
-          ((= x (maze-width maze)) (loop 0 (+ y 1) id))
-          ((eq? (maze-cell maze x y) 'ghost)
-           (cons (make-ghost (make-roamer x y ghost-speed #f #f '(wall) #f)
-                             id
-                             'chasing
-                             0
-                             x
-                             y
-                             (make-target (make-node 0 0 0) (make-node 0 0 0)))
-                 (loop (+ x 1) y (+ id 1))))
-          (else (loop (+ x 1) y id)))))
+  (map (lambda (n) (make-ghost (make-roamer (node-x n) (node-y n) ghost-speed #f #f '(wall) #f)
+                               (node-id n)
+                               'chasing
+                               0
+                               n
+                               (make-target (make-node 0 0 0) (make-node 0 0 0))))
+       (ghost-home-nodes maze)))
 
 (define (cell-aligned? x y) (and (integer? x) (integer? y)))
 
@@ -165,7 +161,12 @@
 
 (define (chasing-ghosts ghost-lst) (filter-ghosts-by-mode ghost-lst 'chasing))
 
+(define (returning-ghosts ghost-lst) (filter-ghosts-by-mode ghost-lst 'returning))
+
 (define (ghost-movement ghost-lst maze last-meal frame-number player-x player-y)
+  (define (ghost-home? g)
+   (and (= (roamer-x (ghost-roamer g)) (node-x (ghost-home-node g)))
+        (= (roamer-y (ghost-roamer g)) (node-y (ghost-home-node g)))))
   (define (become-scared g)
     (struct-copy ghost g (flee-frame frame-number)
                          (mode 'fleeing)
@@ -175,9 +176,14 @@
     (struct-copy ghost g (mode 'chasing)
                          (roamer (change-speed (ghost-roamer g) ghost-speed))))
   (define (transform-ghost g)
-    (cond ((eq? last-meal 'powerpill) (become-scared g))
+    (cond ((and (eq? last-meal 'powerpill)
+                (not (eq? (ghost-mode g) 'returning)))
+           (become-scared g))
           ((and (eq? (ghost-mode g) 'fleeing)
                 (>= (- frame-number (ghost-flee-frame g)) scared-ghost-frames))
+           (become-bold g))
+          ((and (eq? (ghost-mode g) 'returning)
+                (ghost-home? g))
            (become-bold g))
           (else g)))
   (define (gle v1 v2 v3 v4 v5)
@@ -192,6 +198,7 @@
     (define y1 (roamer-y r1))
     (define y2 (roamer-y r2))
     (and (not (opposite-direction? d1 d2))
+         (fnof eq? ghost-mode g1 g2)
          (or (and (= x1 x2)
                   (= y1 y2)
                   (< (ghost-id g1) (ghost-id g2)))
@@ -211,7 +218,9 @@
          (map (lambda (g) (follow-mission g maze))
               (assign-missions player-x player-y (chasing-ghosts transformed-ghosts) maze))
          (map (lambda (g) (run-like-the-wind player-x player-y g maze))
-              (fleeing-ghosts transformed-ghosts)))))
+              (fleeing-ghosts transformed-ghosts))
+         (map (lambda (g) (return-home g maze))
+              (returning-ghosts transformed-ghosts)))))
 
 ;; provide a list of of ghost refs that have collided with our player
 (define (collisions player-x player-y ghost-lst mode)
@@ -236,20 +245,16 @@
 (define (ghosts-caught player ghost-lst)
   (collisions (roamer-x player) (roamer-y player) ghost-lst 'fleeing))
 
-;; this proc is a temporary measure
-;; it is here to set ghost structs to their base location
-;; once we have maze graphs in place, we can have another ghost mode for the
-;; um... ghosts of ghosts and they can make their way back to base via the
-;; shortest route
 (define (back-to-base g)
-  (struct-copy ghost g (mode 'chasing)
-                       (roamer (make-roamer (ghost-home-x g)
-                                            (ghost-home-y g)
-                                            ghost-speed
-                                            #f
-                                            #f
-                                            '(wall)
-                                            #f))))
+  (define (roamer-returning r)
+    (struct-copy roamer r (speed returning-ghost-speed)
+                          (next-speed #f)
+                          (x (snap-coord (roamer-x r)))
+                          (y (snap-coord (roamer-y r)))))
+  (struct-copy ghost g (mode 'returning)
+                       (roamer (roamer-returning (ghost-roamer g)))
+                       (target (make-target (ghost-home-node g)
+                                            (make-node 0 0 0)))))
 
 ;;;; ghost strategy 
 ;; fixme: it it not necessary to re-evalue this every frame as the player
@@ -416,3 +421,13 @@
                                                opposite-dir)))
                         (navcell maze gx gy)))))))
     (struct-copy ghost g (roamer (change-direction (ghost-roamer g) dir)))))
+
+; "dead" ghost return to its point of origin
+(define (return-home g maze)
+  (struct-copy
+    ghost g 
+    (roamer (change-direction (ghost-roamer g)
+                              (shortway-direction (ghost-shortway g 
+                                                                 (ghost-target g) 
+                                                                 maze))))))
+

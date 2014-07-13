@@ -14,6 +14,7 @@
          maze->2dvect
          cell-to-node-shortest
          longest-shortway
+         ghost-home-nodes
          display-shortest-dists
          (struct-out node)
          (struct-out fingerpost)
@@ -67,13 +68,14 @@
   (define (path? x y)
     (define cell-value (2dvect-ref grid (modulo x width) (modulo y height)))
     (and (not (eq? cell-value 'wall)) (not (eq? cell-value 'void))))
+  (define (ghost? x y) (eq? (2dvect-ref grid x y) 'ghost))
   (define (exits x y)
     (+ (if (path? (- x 1) y) 1 0)
        (if (path? (+ x 1)  y) 1 0)
        (if (path? x (- y 1)) 1 0)
        (if (path? x (+ y 1)) 1 0)))
   ;; for our purposes, a node is any path cell that does not have two exits
-  (define (node? x y) (not (= (exits x y) 2)))
+  (define (node? x y) (or (not (= (exits x y) 2)) (ghost? x y)))
   (define nodes
     (let loop ((x 0) (y 0) (id 0))
       (cond ((= y height) '())
@@ -221,6 +223,10 @@
                           (>= dist (shortway-distance shortest-way)))
                       shortest-way
                       (make-shortway direction dist)))))))
+
+(define (ghost-home-nodes maze)
+  (filter (lambda (n) (eq? (maze-cell maze (node-x n) (node-y n)) 'ghost))
+          (maze-nodes maze)))
 
 (define (display-shortest-dists maze)
   (define number-of-nodes (car (maze-shortest-dists maze)))

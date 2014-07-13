@@ -16,7 +16,7 @@
          bloke-shut
          bloke-ajar-left bloke-ajar-right bloke-ajar-up bloke-ajar-down
          bloke-open-left bloke-open-right bloke-open-up bloke-open-down
-         ghost scared-ghost
+         ghost scared-ghost dead-ghost
          node-halo  ;; debug
          score-200 score-400 score-800 score-1600)
           
@@ -421,8 +421,23 @@
                        "@@    @@    @@    @@"
                        "@@    @@    @@    @@")))
 
+(define p-dead-ghost
+  (make-proto-bitmap 20
+                     20
+                     '("" "" "" ""
+                       "     @@@    @@@"
+                       "     @@@    @@@"
+                       "    @@@@@  @@@@@"
+                       "    @@@@@  @@@@@"
+                       "    @@@@@  @@@@@"
+                       "    @@@@@  @@@@@"
+                       "     @@@    @@@"
+                       "     @@@    @@@"
+                       "" "" "" "" "" "" "" "")))
+
 (define ghost (proto-bitmap->bitmap p-ghost))
 (define scared-ghost (proto-bitmap->bitmap p-scared-ghost))
+(define dead-ghost (proto-bitmap->bitmap p-dead-ghost))
 
 ;; ghost scores
 ;; ~~~~~~~~~~~~

@@ -36,8 +36,9 @@
 (define ghost4-colour (send the-color-database find-color "Aqua"))
 (define scaredghost-colour (send the-color-database find-color "DodgerBlue"))
 (define scaredghostending-colour (send the-color-database find-color "White"))
+(define deadghost-colour (send the-color-database find-color "DimGray"))
 (define forcefield-colour (send the-color-database find-color "Lime"))
-(define ghostscore-colour (send the-color-database find-color "Turquoise"))
+(define ghostscore-colour (send the-color-database find-color "Cyan"))
 (define other-colour (send the-color-database find-color "Black"))
 
 (define (cell-bitmap cell cell-above cell-below cell-left cell-right)
@@ -147,7 +148,10 @@
 
 (define (render-ghost x y id mode flee-frames-left dc)
   (send dc draw-bitmap
-           (if (eq? mode 'fleeing) scared-ghost ghost)
+           (case mode
+             ('chasing ghost)
+             ('fleeing scared-ghost)
+             ('returning dead-ghost))
            (* x cell-size)
            (* y cell-size)
            'solid  ;; not sure if I really like this setting for ghosts...
@@ -156,6 +160,7 @@
                            (zero? (remainder flee-frames-left ghost-flash-period)))
                       scaredghostending-colour
                       scaredghost-colour))
+                 ((eq? mode 'returning) deadghost-colour)
                  (else (case (remainder id 4)
                          ((1) ghost1-colour)
                          ((2) ghost2-colour)
@@ -195,7 +200,7 @@
                ((1600) score-1600))
              (* x cell-size)
              (* y cell-size)
-             'opaque
+             'solid
              ghostscore-colour)))
 
 (define (unrender-ghost-score player-x player-y ghost-x ghost-y maze-state dc)
