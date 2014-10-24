@@ -16,7 +16,8 @@
          bloke-shut
          bloke-ajar-left bloke-ajar-right bloke-ajar-up bloke-ajar-down
          bloke-open-left bloke-open-right bloke-open-up bloke-open-down
-         ghost scared-ghost dead-ghost
+         player-death-throes
+         normal-ghost scared-ghost dead-ghost
          node-halo  ;; debug
          score-200 score-400 score-800 score-1600)
           
@@ -370,6 +371,193 @@
 (define bloke-ajar-up (proto-bitmap->bitmap p-bloke-ajar-up))
 (define bloke-open-up (proto-bitmap->bitmap p-bloke-open-up))
 
+;; death throes
+(define p-bloke-die1
+  (make-proto-bitmap 20
+                     20
+                     '("" "" ""
+                       " @@              @@"
+                       "@@@@            @@@@"
+                       "@@@@@          @@@@@"
+                       "@@@@@@        @@@@@@"
+                       "@@@@@@@      @@@@@@@"
+                       "@@@@@@@@    @@@@@@@@"
+                       "@@@@@@@@@  @@@@@@@@@"
+                       " @@@@@@@@@@@@@@@@@@"
+                       " @@@@@@@@@@@@@@@@@@"
+                       "  @@@@@@@@@@@@@@@@"
+                       "  @@@@@@@@@@@@@@@@"
+                       "   @@@@@@@@@@@@@@"
+                       "     @@@@@@@@@@"
+                       "       @@@@@@"
+                       "" "" "")))
+
+(define p-bloke-die2
+  (make-proto-bitmap 20
+                     20
+                     '("" "" "" "" ""
+                       " @                @ "
+                       "@@@              @@@"
+                       "@@@@            @@@@"
+                       "@@@@@@        @@@@@@"
+                       "@@@@@@@      @@@@@@@"
+                       "@@@@@@@@@  @@@@@@@@@"
+                       " @@@@@@@@@@@@@@@@@@"
+                       " @@@@@@@@@@@@@@@@@@"
+                       "  @@@@@@@@@@@@@@@@"
+                       "  @@@@@@@@@@@@@@@@"
+                       "   @@@@@@@@@@@@@@"
+                       "     @@@@  @@@@"
+                       "" "" "")))
+
+(define p-bloke-die3
+  (make-proto-bitmap 20
+                     20
+                     '("" "" "" "" "" "" ""
+                       "@@@              @@@"
+                       "@@@@@          @@@@@"
+                       "@@@@@@@      @@@@@@@"
+                       "@@@@@@@@@  @@@@@@@@@"
+                       " @@@@@@@@@@@@@@@@@@"
+                       " @@@@@@@@@@@@@@@@@@"
+                       "  @@@@@@@@@@@@@@@@"
+                       "  @@@@@@@@@@@@@@@@"
+                       "   @@@@@@@@@@@@@@"
+                       "     @@@@  @@@@"
+                       "" "" "")))
+
+(define p-bloke-die4
+  (make-proto-bitmap 20
+                     20
+                     '("" "" "" "" "" "" "" "" ""
+                       "@@@@            @@@@"
+                       "@@@@@@@      @@@@@@@"
+                       "@@@@@@@@@@@@@@@@@@@@"
+                       " @@@@@@@@@@@@@@@@@@"
+                       " @@@@@@@@@@@@@@@@@@"
+                       "  @@@@@@@@@@@@@@@@"
+                       "  @@@@@@@@@@@@@@@@"
+                       "   @@@@@@  @@@@@@"
+                       "" "" "")))
+
+(define p-bloke-die5
+  (make-proto-bitmap 20
+                     20
+                     '("" "" "" "" "" "" "" "" "" "" ""
+                       "       @@@@@@"
+                       "    @@@@@@@@@@@@"
+                       " @@@@@@@@@@@@@@@@@@"
+                       " @@@@@@@@@@@@@@@@@@"
+                       "  @@@@@@@@@@@@@@@@"
+                       "  @@@@@@@@@@@@@@@@"
+                       "   @@@@@@  @@@@@@"
+                       "" "")))
+
+(define p-bloke-die6
+  (make-proto-bitmap 20
+                     20
+                     '("" "" "" "" "" "" "" "" "" "" ""
+                       "        @@@@"
+                       "     @@@@@@@@@@"
+                       "  @@@@@@@@@@@@@@@@"
+                       " @@@@@@@@@@@@@@@@@@"
+                       " @@@@@@@@@@@@@@@@@@"
+                       "  @@@@@@@@@@@@@@@@"
+                       "  @@@@@@@  @@@@@@@"
+                       "   @@@@@    @@@@@"
+                       "")))
+
+(define p-bloke-die7
+  (make-proto-bitmap 20
+                     20
+                     '("" "" "" "" "" "" "" "" "" "" ""
+                       "         @@"
+                       "        @@@@"
+                       "      @@@@@@@@"
+                       "     @@@@@@@@@@"
+                       "   @@@@@@@@@@@@@@"
+                       " @@@@@@@@@@@@@@@@@@"
+                       " @@@@@@@@@@@@@@@@@@"
+                       "  @@@@@@@  @@@@@@@"
+                       "  @@@@@@    @@@@@@")))
+
+(define p-bloke-die8
+  (make-proto-bitmap 20
+                     20
+                     '("" "" "" "" "" "" "" "" "" "" ""
+                       "         @@"
+                       "        @@@@"
+                       "       @@@@@@"
+                       "       @@@@@@"
+                       "      @@@@@@@@"
+                       "     @@@@@@@@@@"
+                       "    @@@@@@@@@@@@"
+                       "   @@@@@@@@@@@@@@"
+                       "    @@@@@  @@@@@")))
+
+(define p-bloke-die9
+  (make-proto-bitmap 20
+                     20
+                     '("" "" "" "" "" "" "" "" "" "" ""
+                       "         @@"
+                       "         @@"
+                       "        @@@@"
+                       "        @@@@"
+                       "       @@@@@@"
+                       "       @@@@@@"
+                       "      @@@@@@@@"
+                       "      @@@@@@@@"
+                       "       @@  @@")))
+
+(define p-bloke-die10
+  (make-proto-bitmap 20
+                     20
+                     '("" "" "" "" "" "" "" "" "" "" ""
+                       "         @@"
+                       "         @@"
+                       "         @@"
+                       "         @@"
+                       "         @@"
+                       "         @@"
+                       "         @@"
+                       "         @@"
+                       "")))
+
+(define p-bloke-die11
+  (make-proto-bitmap 20
+                     20
+                     '("" ""
+                       "      @        @"
+                       "   @   @      @"
+                       "    @   @    @   @"
+                       "     @          @"
+                       "               @"
+                       ""
+                       ""
+                       "  @@@"
+                       "                @@@"
+                       ""
+                       ""
+                       "     @"
+                       "    @          @"
+                       "   @   @    @   @"
+                       "      @      @   @"
+                       "     @        @")))
+
+(define player-death-throes
+  (cons bloke-shut (map proto-bitmap->bitmap
+                        (list p-bloke-die1
+                              p-bloke-die2
+                              p-bloke-die3
+                              p-bloke-die4
+                              p-bloke-die5
+                              p-bloke-die6
+                              p-bloke-die7
+                              p-bloke-die8
+                              p-bloke-die9
+                              p-bloke-die10
+                              p-bloke-die11))))
+
 ;; ghosts
 ;; ~~~~~~
 
@@ -435,7 +623,7 @@
                        "     @@@    @@@"
                        "" "" "" "" "" "" "" "")))
 
-(define ghost (proto-bitmap->bitmap p-ghost))
+(define normal-ghost (proto-bitmap->bitmap p-ghost))
 (define scared-ghost (proto-bitmap->bitmap p-scared-ghost))
 (define dead-ghost (proto-bitmap->bitmap p-dead-ghost))
 

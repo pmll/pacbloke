@@ -6,30 +6,16 @@
          make-ghosts
          player-movement
          ghost-movement
-         scared-ghost-frames
          player-caught?
          ghosts-caught
-         back-to-base
-         (struct-out roamer)
-         (struct-out ghost)
-         (struct-out target))
+         back-to-base)
  
 (require "maze.rkt"
-         "common.rkt")
+         "common.rkt"
+         "movables.rkt"
+         "settings.rkt")
 
 (define null-node (make-node 0 0 0))
-
-(define player-speed 5)
-
-(define ghost-speed 5)
-
-(define scared-ghost-speed 10)
-
-(define returning-ghost-speed 2)
-
-(define min-collision-area (/ 1 10))
-
-(define scared-ghost-frames 100)
 
 ;; a bit like (modulo a b) except that a doesn't have to be whole
 (define (clock-number a b)
@@ -37,18 +23,8 @@
         ((>= a b) (- a b))
         (else a)))
 
-;; here speed denotes which fraction of unit is travelled in each frame
-;; so the higher the value, the slower the travel
-;; that way, the object in question is guaranteed to exactly align with a cell
-;; at some point as it travels through it
-(define-struct roamer (x y speed direction next-direction blocked-by next-speed))
-
-(define-struct target (node not-via))
-
 (define (target-eq? t1 t2)
   (and (fnof eq? target-node t1 t2) (fnof eq? target-not-via t1 t2)))
-
-(define-struct ghost (roamer id mode flee-frame home-node target))
 
 (define (make-player maze)
   (let-values (((x y) (maze-member maze 'player)))

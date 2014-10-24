@@ -4,7 +4,7 @@
 
 (require "common.rkt"
          "maze.rkt"
-         "movement.rkt")
+         "movables.rkt")
 
 (provide make-maze-state
          cell-state

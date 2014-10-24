@@ -4,16 +4,12 @@
 
 (require racket/gui/base)
 
-(require "mazes.rkt"
+(require "settings.rkt"
          "display.rkt"
+         "movables.rkt"
          "movement.rkt"
          "state.rkt"
          "maze.rkt")
-
-(define debug #f)
-
-(define frame-interval 50)
-;(define frame-interval 250)
 
 (define game-canvas%
   (class canvas%
@@ -47,49 +43,19 @@
                                    (render-score c dc (lives! 0) (score! 0))))))
   (define maze-canvas
     (new game-canvas% (parent main-frame)
-                      (paint-callback (lambda (c dc) (render-maze c maze)))))
+                      (paint-callback (lambda (c dc) (render-maze maze)))))
   (resize-main-frame)
-  (define maze-dc (send maze-canvas get-dc))
   (define (unrender-all-roamers player ghost-lst)
-    (unrender (roamer-x player) (roamer-y player) maze-dc maze-state)
-    (for-each (lambda (g) (unrender (roamer-x (ghost-roamer g))
-                                    (roamer-y (ghost-roamer g))
-                                    maze-dc
-                                    maze-state))
-              ghost-lst)
-    (when debug
-          (for-each (lambda (g) (unrender (node-x (target-node (ghost-target g)))
-                                          (node-y (target-node (ghost-target g)))
-                                          maze-dc
-                                          maze-state))
-                    ghost-lst)))
-  (define (render-player player)
-    (render-bloke (roamer-x player)
-                  (roamer-y player)
-                  (roamer-direction player)
-                  maze-dc
-                  frame-number))
+    (unrender-roamer player maze-state)
+    (unrender-ghosts ghost-lst maze-state)
+    (when debug (unrender-target-halos ghost-lst maze-state))) 
   (define (render-all-roamers player ghost-lst)
-    (render-player player)
-    (for ((g ghost-lst)) (render-ghost (roamer-x (ghost-roamer g))
-                                       (roamer-y (ghost-roamer g))
-                                       (ghost-id g)
-                                       (ghost-mode g)
-                                       (+ (- scared-ghost-frames
-                                             frame-number)
-                                          (ghost-flee-frame g))
-                                       maze-dc))
-    (when debug (for ((g ghost-lst))
-                     (render-node-halo (node-x (target-node (ghost-target g)))
-                                       (node-y (target-node (ghost-target g)))
-                                       (ghost-id g)
-                                       maze-dc))))
+    (render-player player frame-number)
+    (render-ghosts ghost-lst frame-number)
+    (when debug (render-target-halos ghost-lst)))
   (define (player-death)
-    ;; an animation sequence of the death throes would be nice at this point.
-    ;; for now, we pause a short while so as the calamity can be observed
     (send ticker stop)
-    (render-lose-life)
-    (sleep 2)
+    (render-lose-life player maze-state ghost-lst)
     (cond ((>= (lives! -1) 0)
            (let ((new-player (make-player maze))
                  (new-ghost-lst (make-ghosts maze)))
@@ -103,7 +69,7 @@
              (set! ghost-lst new-ghost-lst)
              (send ticker start frame-interval)))
           (else (clear-main-frame-canvases)
-                (title))))
+                (title (score! 0)))))
   ;; update a normal gameplay frame
   (define (play-frame)
     (let* ((new-player (player-movement player (if (last-input-a-direction?) (last-input) #f) maze))
@@ -146,34 +112,11 @@
     (let ((new-ghost-lst
           (map (lambda (g)
                  (cond ((memq (ghost-id g) caught)
-                        (send maze-canvas suspend-flush)
-                        (unrender (roamer-x (ghost-roamer g))
-                                  (roamer-y (ghost-roamer g))
-                                  maze-dc
-                                  maze-state)
-                        ;; re-render player to restore what was taken
-                        ;; out by ghost
-                        (render-player player)
-                        (render-ghost-score (roamer-x player)
-                                            (roamer-y player)
-                                            (roamer-x (ghost-roamer g))
-                                            (roamer-y (ghost-roamer g))
+                        (render-ghost-eaten g 
+                                            player
                                             (ghost-score! 'read)
-                                            maze-dc)
-                        (send maze-canvas resume-flush)
-                        (send maze-canvas flush)
-                        (render-ghost-eaten)
-                        ;; pause just long enough to read the score
-                        (sleep 0.5)
-                        (send maze-canvas suspend-flush)
-                        (unrender-ghost-score (roamer-x player)
-                                              (roamer-y player)
-                                              (roamer-x (ghost-roamer g))
-                                              (roamer-y (ghost-roamer g))
-                                              maze-state
-                                              maze-dc)
-                        (send maze-canvas resume-flush)
-                        (send maze-canvas flush)
+                                            maze-state
+                                            frame-number)
                         (score! (ghost-score! 'consume))
                         (back-to-base g))
                        (else g)))
@@ -196,16 +139,17 @@
                       (consume-last-input!)
                       (send ticker stop)
                       (clear-main-frame-canvases)
-                      (title))
+                      (title 0))
                      ((eq? (last-input) 'pause) #f)
                      ((player-caught? player ghost-lst) (player-death))
                      ((not (null? ghosts-captured)) (eat-ghosts ghosts-captured))
                      (else (play-frame))))))
          (interval frame-interval)))
+  (register-maze-canvas maze-canvas)
   (send maze-canvas focus)
   (when debug (display-shortest-dists maze)))
 
-(define (title)
+(define (title last-score)
   (define title-canvas%
     (class canvas%
       (define/override (on-char keyevent)
@@ -214,12 +158,16 @@
                        (clear-main-frame-canvases)
                        (consume-last-input!)
                        (play-maze (make-scorer 0)
-                                  (make-scorer 2)
-                                  (list mini-trad-maze traditional-maze))))
+                                  (make-scorer (- initial-lives 1))
+                                  maze-order)))
           ((#\s #\S) (begin (toggle-sound!) (send title-canvas refresh)))
           ((#\q #\Q) (send main-frame show #f))))
 
       (super-new)))
+  (define score-canvas
+    (new canvas% (parent main-frame)
+                 (paint-callback (lambda (c dc)
+                                   (render-score c dc initial-lives last-score)))))
   (define title-canvas
     (new title-canvas% (parent main-frame)
                        (paint-callback (lambda (c dc) (render-title c)))))
@@ -227,4 +175,4 @@
   (send title-canvas focus))
 
 (send main-frame show #t)
-(title)
+(title 0)
