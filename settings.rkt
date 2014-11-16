@@ -12,14 +12,12 @@
 (define scared-ghost-frames 100)
 (define ghost-flash-period 3)           ; in frames
 (define ghost-flash-point 21)           ; in frames remaining
-;; here speed denotes which fraction of unit is travelled in each frame
-;; so the higher the value, the slower the travel
-;; that way, the object in question is guaranteed to exactly align with a cell
-;; at some point as it travels through it
-(define player-speed 5)
-(define ghost-speed 5)
-(define scared-ghost-speed 10)
-(define returning-ghost-speed 2)
+;; speeds should be such that the object in question is guaranteed to align
+;; with a cell at some point as it travels through it
+(define player-speed (/ 1 5))
+(define ghost-speed (/ 1 5))
+(define scared-ghost-speed (/ 1 10))
+(define returning-ghost-speed (/ 1 2))
 ; fraction of overlapping area required between ghost and player to be
 ; considered a collision
 (define min-collision-area (/ 1 10))

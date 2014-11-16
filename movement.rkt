@@ -42,7 +42,7 @@
                                'chasing
                                0
                                n
-                               (make-target (make-node 0 0 0) (make-node 0 0 0))))
+                               (make-target null-node null-node)))
        (ghost-home-nodes maze)))
 
 (define (cell-aligned? x y) (and (integer? x) (integer? y)))
@@ -60,27 +60,26 @@
 
 (define (next-position maze x y direction speed)
   (cond ((eq? direction 'up) 
-         (values x (clock-number (- y (/ 1 speed)) (maze-height maze))))
+         (values x (clock-number (- y speed) (maze-height maze))))
         ((eq? direction 'down)
-         (values x (clock-number (+ y (/ 1 speed)) (maze-height maze))))
+         (values x (clock-number (+ y speed) (maze-height maze))))
         ((eq? direction 'left)
-         (values (clock-number (- x (/ 1 speed)) (maze-width maze)) y))
+         (values (clock-number (- x speed) (maze-width maze)) y))
         ((eq? direction 'right)
-         (values (clock-number (+ x (/ 1 speed)) (maze-width maze)) y))
+         (values (clock-number (+ x speed) (maze-width maze)) y))
         (else (values x y))))
   
-(define (can-enter-cell? maze x y blocked-by)
-  (not (memq (maze-cell maze x y) blocked-by)))
-
 (define (can-occupy-coordinates? maze x y blocked-by)
+  (define (can-enter-cell? x y)
+    (not (memq (maze-cell maze x y) blocked-by)))
   (let ((floor-x (clock-number (floor x) (maze-width maze)))
         (floor-y (clock-number (floor y) (maze-height maze)))
         (ceil-x  (clock-number (ceiling x) (maze-width maze)))
         (ceil-y  (clock-number (ceiling y) (maze-height maze))))
-    (and (can-enter-cell? maze floor-x floor-y blocked-by)
-         (can-enter-cell? maze floor-x ceil-y blocked-by)
-         (can-enter-cell? maze ceil-x floor-y blocked-by)
-         (can-enter-cell? maze ceil-x ceil-y blocked-by))))
+    (and (can-enter-cell? floor-x floor-y)
+         (can-enter-cell? floor-x ceil-y)
+         (can-enter-cell? ceil-x floor-y)
+         (can-enter-cell? ceil-x ceil-y ))))
 
 ;; change of direction does not happen right away, it may never happen.
 ;; it is queued up as the next direction to take and it will happen if and when
@@ -139,51 +138,65 @@
 
 (define (returning-ghosts ghost-lst) (filter-ghosts-by-mode ghost-lst 'returning))
 
+;; the ghosts will tend to clump together at times, we want to avoid them
+;; overlaying one another with the following exceptions:
+;; if they are moving in opposite directions, we let them cross over
+;; if they are in different modes we let one overtake the other as different
+;; modes implies different (eventual) speeds
+(define (ghost-invading-personal-space? violator violatee)
+  (define (gle v1 v2 v3 v4 v5)
+    (and (< v1 v2) (< v2 v3) (= v4 v5)))
+  (define r1 (ghost-roamer violator))
+  (define r2 (ghost-roamer violatee))
+  (define d1 (roamer-direction r1))
+  (define d2 (roamer-direction r2))
+  (define x1 (roamer-x r1))
+  (define x2 (roamer-x r2))
+  (define y1 (roamer-y r1))
+  (define y2 (roamer-y r2))
+  (and (not (eq? violator violatee))
+       (not (opposite-direction? d1 d2))
+       (fnof eq? ghost-mode violator violatee)
+           ;; if two ghosts are in idntical positions (should rarely happen)
+           ;; we apply the arbitrary rule that the one with the higher id
+           ;; gets priority.
+       (or (and (= x1 x2)
+                (= y1 y2)
+                (< (ghost-id violator) (ghost-id violatee)))
+           (and (eq? d1 'left) (gle (- x1 1) x2 x1 y1 y2))
+           (and (eq? d1 'right) (gle x1 x2 (+ x1 1) y1 y2))
+           (and (eq? d1 'up) (gle (- y1 1) y2 y1 x1 x2))
+           (and (eq? d1 'down) (gle y1 y2 (+ y1 1) x1 x2)))))
+
+(define (ghost-home? g)
+  (and (= (roamer-x (ghost-roamer g)) (node-x (ghost-home-node g)))
+       (= (roamer-y (ghost-roamer g)) (node-y (ghost-home-node g)))))
+
+(define (embolden-ghost g)
+  (struct-copy ghost g (mode 'chasing)
+                       (roamer (change-speed (ghost-roamer g) ghost-speed))))
+
+(define (spook-ghost g frame-number)
+  (struct-copy ghost g
+               (flee-frame frame-number)
+               (mode 'fleeing)
+               (target (make-target null-node null-node))
+               (roamer (change-speed (ghost-roamer g) scared-ghost-speed))))
+
 (define (ghost-movement ghost-lst maze last-meal frame-number player-x player-y)
-  (define (ghost-home? g)
-   (and (= (roamer-x (ghost-roamer g)) (node-x (ghost-home-node g)))
-        (= (roamer-y (ghost-roamer g)) (node-y (ghost-home-node g)))))
-  (define (become-scared g)
-    (struct-copy ghost g (flee-frame frame-number)
-                         (mode 'fleeing)
-                         (target (make-target (make-node 0 0 0) (make-node 0 0 0)))
-                         (roamer (change-speed (ghost-roamer g) scared-ghost-speed))))
-  (define (become-bold g)
-    (struct-copy ghost g (mode 'chasing)
-                         (roamer (change-speed (ghost-roamer g) ghost-speed))))
   (define (transform-ghost g)
     (cond ((and (eq? last-meal 'powerpill)
                 (not (eq? (ghost-mode g) 'returning)))
-           (become-scared g))
-          ((and (eq? (ghost-mode g) 'fleeing)
-                (>= (- frame-number (ghost-flee-frame g)) scared-ghost-frames))
-           (become-bold g))
-          ((and (eq? (ghost-mode g) 'returning)
-                (ghost-home? g))
-           (become-bold g))
+           (spook-ghost g frame-number))
+          ((or (and (eq? (ghost-mode g) 'fleeing)
+                    (>= (- frame-number (ghost-flee-frame g))
+                        scared-ghost-frames))
+               (and (eq? (ghost-mode g) 'returning)
+                    (ghost-home? g)))
+           (embolden-ghost g))
           (else g)))
-  (define (gle v1 v2 v3 v4 v5)
-    (and (> v2 v1) (< v2 v3) (= v4 v5)))
-  (define (ghost-in-bubble? g1 g2)
-    (define r1 (ghost-roamer g1))
-    (define r2 (ghost-roamer g2))
-    (define d1 (roamer-direction r1))
-    (define d2 (roamer-direction r2))
-    (define x1 (roamer-x r1))
-    (define x2 (roamer-x r2))
-    (define y1 (roamer-y r1))
-    (define y2 (roamer-y r2))
-    (and (not (opposite-direction? d1 d2))
-         (fnof eq? ghost-mode g1 g2)
-         (or (and (= x1 x2)
-                  (= y1 y2)
-                  (< (ghost-id g1) (ghost-id g2)))
-             (and (eq? d1 'left) (gle (- x1 1) x2 x1 y1 y2))
-             (and (eq? d1 'right) (gle x1 x2 (+ x1 1) y1 y2))
-             (and (eq? d1 'up) (gle (- y1 1) y2 y1 x1 x2))
-             (and (eq? d1 'down) (gle y1 y2 (+ y1 1) x1 x2)))))
   (define (right-of-way? g)
-    (not (ormap (lambda (h) (ghost-in-bubble? g h)) ghost-lst)))
+    (not (ormap (lambda (h) (ghost-invading-personal-space? g h)) ghost-lst)))
   (define (move-ghost g)
     (if (right-of-way? g)
         (struct-copy ghost g (roamer (realise-motion maze (ghost-roamer g))))
@@ -192,7 +205,9 @@
   (map move-ghost
        (append
          (map (lambda (g) (follow-mission g maze))
-              (assign-missions player-x player-y (chasing-ghosts transformed-ghosts) maze))
+              (assign-missions player-x
+                               player-y
+                               (chasing-ghosts transformed-ghosts) maze))
          (map (lambda (g) (run-like-the-wind player-x player-y g maze))
               (fleeing-ghosts transformed-ghosts))
          (map (lambda (g) (return-home g maze))
@@ -230,7 +245,7 @@
   (struct-copy ghost g (mode 'returning)
                        (roamer (roamer-returning (ghost-roamer g)))
                        (target (make-target (ghost-home-node g)
-                                            (make-node 0 0 0)))))
+                                            null-node))))
 
 ;;;; ghost strategy 
 ;; fixme: it it not necessary to re-evalue this every frame as the player
@@ -398,7 +413,7 @@
                         (navcell maze gx gy)))))))
     (struct-copy ghost g (roamer (change-direction (ghost-roamer g) dir)))))
 
-; "dead" ghost return to its point of origin
+;; "dead" ghost return to its point of origin
 (define (return-home g maze)
   (struct-copy
     ghost g 

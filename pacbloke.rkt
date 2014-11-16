@@ -44,7 +44,6 @@
   (define maze-canvas
     (new game-canvas% (parent main-frame)
                       (paint-callback (lambda (c dc) (render-maze maze)))))
-  (resize-main-frame)
   (define (unrender-all-roamers player ghost-lst)
     (unrender-roamer player maze-state)
     (unrender-ghosts ghost-lst maze-state)
@@ -85,10 +84,7 @@
       (render-all-roamers new-player new-ghost-lst)
       (send maze-canvas resume-flush)
       (send maze-canvas flush)
-      (set! player new-player)
-      (set! ghost-lst new-ghost-lst)
       (when (eq? (last-input) 'togglesound) (toggle-sound!))
-      (consume-last-input!)
       (when (eq? player-meal 'dot)
             (score! 10)
             (render-dot-eaten)
@@ -98,14 +94,17 @@
             (ghost-score! 'reset)
             (render-powerpill-eaten)
             (send score-canvas refresh))
-      (set! frame-number (+ frame-number 1))
       (when (zero? (eatables-left maze-state))
             (send ticker stop)
             (sleep 1)
             (clear-main-frame-canvases)
             (play-maze score!
                        lives!
-                       (append (cdr maze-lst) (list maze))))))
+                       (append (cdr maze-lst) (list maze))))
+      (consume-last-input!)
+      (set! frame-number (+ frame-number 1))
+      (set! player new-player)
+      (set! ghost-lst new-ghost-lst)))
   ;; eat ghosts which involves displaying a score with a pause
   (define (eat-ghosts caught)
     (send ticker stop)
@@ -145,6 +144,7 @@
                      ((not (null? ghosts-captured)) (eat-ghosts ghosts-captured))
                      (else (play-frame))))))
          (interval frame-interval)))
+  (resize-main-frame)
   (register-maze-canvas maze-canvas)
   (send maze-canvas focus)
   (when debug (display-shortest-dists maze)))
@@ -162,7 +162,6 @@
                                   maze-order)))
           ((#\s #\S) (begin (toggle-sound!) (send title-canvas refresh)))
           ((#\q #\Q) (send main-frame show #f))))
-
       (super-new)))
   (define score-canvas
     (new canvas% (parent main-frame)

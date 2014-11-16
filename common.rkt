@@ -33,5 +33,3 @@
   (vector-count (lambda (e) (eq? e item)) (caddr v)))
 
 (define (2dvect-copy v) (list (car v) (cadr v) (vector-copy (caddr v))))
-
-
